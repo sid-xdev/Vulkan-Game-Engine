@@ -4,6 +4,7 @@
 
 #include <renderer/GameGraphicEngine.hpp>
 #include <renderer/MemoryManagement.hpp>
+#include <renderer/RenderQuery.hpp>
 
 #include <logic/GameLogicEngine.hpp>
 #include <logic/GeometryLogic.hpp>
@@ -197,7 +198,11 @@ bool noxcain::GeometryTask::record( const std::vector<vk::CommandBuffer>& buffer
 	const vk::CommandBufferInheritanceInfo inharitage( render_pass, subpass_index, frame_buffers.empty() ? vk::Framebuffer() : frame_buffers.front() );
 	r_handler << c_buffer.begin( vk::CommandBufferBeginInfo( vk::CommandBufferUsageFlagBits::eRenderPassContinue | vk::CommandBufferUsageFlagBits::eOneTimeSubmit, &inharitage ) );
 
-	//deferredCommandBuffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)TimestampIds::START );
+	vk::QueryPool timestamp_pool = GraphicEngine::get_render_query().get_timestamp_pool();
+	if( timestamp_pool )
+	{
+		c_buffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::START );
+	}
 
 	if( !geometry_lists.empty() )
 	{
@@ -233,9 +238,11 @@ bool noxcain::GeometryTask::record( const std::vector<vk::CommandBuffer>& buffer
 		}
 	}
 
-	//deferredCommandBuffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)TimestampIds::AFTER_GEOMETRY );
+	if( timestamp_pool )
+	{
+		c_buffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::AFTER_GEOMETRY );
+	}
 
 	r_handler << c_buffer.end();
 	return r_handler.all_okay();
-	
 }

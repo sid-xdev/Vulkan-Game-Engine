@@ -6,6 +6,7 @@
 #include <renderer/GraphicCore.hpp>
 #include <renderer/MemoryManagement.hpp>
 #include <renderer/ShaderManager.hpp>
+#include <renderer/RenderQuery.hpp>
 
 #include <resources/GameResourceEngine.hpp>
 #include <logic/GameLogicEngine.hpp>
@@ -41,6 +42,7 @@ void noxcain::GraphicEngine::initialize()
 	descriptor_sets.reset( new DescriptorSetManager() );
 	memory.reset( new MemoryManager() );
 	shader.reset( new ShaderManager() );
+	render_query.reset( new RenderQuery() );
 }
 
 bool noxcain::GraphicEngine::run( const PresentationSurface& os_surface )
@@ -116,6 +118,11 @@ vk::Extent2D noxcain::GraphicEngine::get_window_resolution()
 noxcain::UINT32 noxcain::GraphicEngine::get_graphic_queue_family_index()
 {
 	return engine->core->get_graphic_queue_family_index();
+}
+
+noxcain::RenderQuery& noxcain::GraphicEngine::get_render_query()
+{
+	return *engine->render_query;
 }
 
 vk::ShaderModule noxcain::GraphicEngine::get_shader( FragmentShaderIds shader_id )

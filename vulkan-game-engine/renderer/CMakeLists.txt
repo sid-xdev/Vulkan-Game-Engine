@@ -18,6 +18,7 @@ target_sources( renderlib
 		MemoryManagement.cpp
 		ShaderManager.cpp
 		RenderPassDescription.cpp
+		RenderQuery.cpp
 )
 
 target_sources( renderlib 
@@ -35,6 +36,7 @@ target_sources( renderlib
 		CommandSubpassTask.hpp
 		ShaderManager.hpp
 		RenderPassDescription.hpp
+		RenderQuery.hpp
 )	
 
 target_compile_features( renderlib PUBLIC cxx_std_17 )

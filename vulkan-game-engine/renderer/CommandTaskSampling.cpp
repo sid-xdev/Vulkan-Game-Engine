@@ -2,6 +2,8 @@
 
 #include <renderer/DescriptorSetManager.hpp>
 #include <renderer/GameGraphicEngine.hpp>
+#include <renderer/RenderQuery.hpp>
+
 #include <logic/GameLogicEngine.hpp>
 #include <tools/ResultHandler.hpp>
 
@@ -86,6 +88,13 @@ bool noxcain::SamplingTask::record( const std::vector<vk::CommandBuffer>& buffer
 		shading_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, sampled_pipeline );
 		shading_buffer.draw( 3, 1, 0, 0 );
 	}
+	
+	vk::QueryPool timestamp_pool = GraphicEngine::get_render_query().get_timestamp_pool();
+	if( timestamp_pool )
+	{
+		shading_buffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::AFTER_SHADING );
+	}
+
 	r_handler << shading_buffer.end();
 
 	return r_handler.all_okay();

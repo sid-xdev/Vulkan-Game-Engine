@@ -4,6 +4,7 @@
 #include <renderer/DescriptorSetManager.hpp>
 #include <renderer/GameGraphicEngine.hpp>
 #include <renderer/MemoryManagement.hpp>
+#include <renderer/RenderQuery.hpp>
 
 #include <logic/GameLogicEngine.hpp>
 #include <logic/Quad2D.hpp>
@@ -43,7 +44,7 @@ bool noxcain::OverlayTask::buffer_dependent_preparation( CommandData& pool_data 
 	ResultHandler<vk::Result> r_handle( vk::Result::eSuccess );
 
 	UINT32 image_count = GraphicEngine::get_swapchain_image_count();
-	return buffer_preparation( pool_data, 2 * image_count );
+	return buffer_preparation( pool_data, 2 * std::size_t( image_count ) );
 }
 
 bool noxcain::OverlayTask::setup_layouts()
@@ -291,19 +292,38 @@ bool noxcain::OverlayTask::record( const std::vector<vk::CommandBuffer>& buffers
 	for( std::size_t index = 0; index < buffers.size() / 2; ++index )
 	{
 		vk::CommandBufferInheritanceInfo inhertiance( render_pass, subpass_index, frame_buffers[index] );
+		vk::QueryPool timestamp_pool = GraphicEngine::get_render_query().get_timestamp_pool();
 
 		// post subpass
 		const auto post_buffer = buffers[2 * index];
 		post_buffer.begin( vk::CommandBufferBeginInfo( vk::CommandBufferUsageFlagBits::eRenderPassContinue | vk::CommandBufferUsageFlagBits::eOneTimeSubmit, &inhertiance ) );
+		
+		if( timestamp_pool )
+		{
+			post_buffer.writeTimestamp( vk::PipelineStageFlagBits::eTopOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::BEFOR_POST );
+		}
+		
 		post_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, post_pipeline );
 		post_buffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, post_pipeline_layout, 0, { GraphicEngine::get_descriptor_set_manager().get_basic_set( BasicDescriptorSets::FINALIZED_MASTER_TEXTURE ) }, {} );
 		post_buffer.draw( 3, 1, 0, 0 );
+		
+		if( timestamp_pool )
+		{
+			post_buffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::AFTER_POST );
+		}
+		
 		post_buffer.end();
 
 		// overlay subpass
 		const auto overlay_buffer = buffers[2 * index + 1];
 		inhertiance.setSubpass( inhertiance.subpass + 1 );
 		overlay_buffer.begin( vk::CommandBufferBeginInfo( vk::CommandBufferUsageFlagBits::eRenderPassContinue | vk::CommandBufferUsageFlagBits::eOneTimeSubmit, &inhertiance ) );
+
+		if( timestamp_pool )
+		{
+			overlay_buffer.writeTimestamp( vk::PipelineStageFlagBits::eTopOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::BEFOR_OVERLAY );
+		}
+
 
 		vk::Rect2D default_scissor( vk::Offset2D( 0, 0 ), GraphicEngine::get_window_resolution() );
 		vk::Rect2D current_scissor;
@@ -340,6 +360,11 @@ bool noxcain::OverlayTask::record( const std::vector<vk::CommandBuffer>& buffers
 					current_scissor = string.record( overlay_buffer, text_pipeline_layout, current_scissor, default_scissor );
 				}
 			}
+		}
+
+		if( timestamp_pool )
+		{
+			overlay_buffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::AFTER_OVERLAY );
 		}
 		overlay_buffer.end();
 	}

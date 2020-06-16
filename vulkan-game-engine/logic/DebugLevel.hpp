@@ -65,7 +65,7 @@ namespace noxcain
 		std::unique_ptr<HorizontalScrollBar> scroll_bar;
 		std::unique_ptr<BaseButton> exit_button;
 
-		constexpr static std::chrono::nanoseconds PERFORMANCE_TIME_FRAME = std::chrono::milliseconds( 100 );
+		constexpr static std::chrono::nanoseconds PERFORMANCE_TIME_FRAME = std::chrono::milliseconds( 10 );
 		std::chrono::steady_clock::time_point performance_time_stamp;
 		std::unique_ptr<Region> scissor_label;
 
@@ -76,8 +76,11 @@ namespace noxcain
 
 		void update_level_logic( const std::chrono::nanoseconds& deltaTime ) override;
 
+		bool is_started = false;
 		bool is_on = false;
 		bool initialized = false;
+
+		std::chrono::steady_clock::time_point measurement_start_time;
 
 	public:
 		DebugLevel();
@@ -85,6 +88,6 @@ namespace noxcain
 		
 		void switch_on();
 		void switch_off();
-		bool on() const;
+		bool on();
 	};
 }

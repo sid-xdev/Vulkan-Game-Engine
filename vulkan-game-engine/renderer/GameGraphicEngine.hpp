@@ -13,6 +13,7 @@ namespace noxcain
 	class ShaderManager;
 	class MemoryManager;
 	class CommandManager;
+	class RenderQuery;
 
 	class  GraphicEngine
 	{
@@ -22,6 +23,7 @@ namespace noxcain
 		std::unique_ptr<MemoryManager> memory;
 		std::unique_ptr<ShaderManager> shader;
 		std::unique_ptr<CommandManager> commands;
+		std::unique_ptr<RenderQuery> render_query;
 		
 		bool clear();
 		void initialize();
@@ -54,6 +56,8 @@ namespace noxcain
 		static vk::Extent2D get_window_resolution();
 
 		static UINT32 get_graphic_queue_family_index();
+
+		static RenderQuery& get_render_query();
 
 		static vk::ShaderModule get_shader( FragmentShaderIds shader_id );
 		static vk::ShaderModule get_shader( ComputeShaderIds shader_id );

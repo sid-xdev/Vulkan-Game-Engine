@@ -8,6 +8,8 @@
 
 #include <renderer/CommandThreadTools.hpp>
 
+#include <tools/TimeFrame.hpp>
+
 namespace noxcain
 {
 	class CommandSubmit
@@ -27,6 +29,9 @@ namespace noxcain
 		bool set_newest_command_buffer( SubmitCommandBufferData buffer_data );
 
 	private:
+		TimeFrameCollector time_collection_all = TimeFrameCollector( "GPU Overall" );
+		TimeFrameCollector time_collection_gpu = TimeFrameCollector( "GPU Sub Tasks" );
+
 		bool shutdown = false;
 		bool swapchain_is_new = false;
 

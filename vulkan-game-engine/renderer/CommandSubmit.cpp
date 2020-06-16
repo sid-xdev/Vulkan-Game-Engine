@@ -2,6 +2,8 @@
 
 #include <renderer/GraphicEngineConstants.hpp>
 #include <renderer/GameGraphicEngine.hpp>
+#include <renderer/RenderQuery.hpp>
+
 #include <tools/ResultHandler.hpp>
 
 noxcain::CommandSubmit::CommandSubmit() : submit_thread( &CommandSubmit::submit_loop, this )
@@ -114,17 +116,15 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 			buffer_available = false;
 		}
 
+		time_collection_all.start_frame( 0.0, 0.7, 0.3, 1.0, "" );
+
 		// submit command buffers
 		{
 			const vk::SwapchainKHR& swapChain = GraphicEngine::get_swapchain();
 			UINT32 image_index = r_handler << device.acquireNextImageKHR( swapChain, GRAPHIC_TIMEOUT_DURATION.count(), get_semaphore( SemaphoreIds::ACQUIRE ), vk::Fence() );
 
-			//render_loop_time_frame.end();
-
 			if( r_handler.all_okay() )
-			{
-				//render_loop_time_frame.start_frame( 0.0, 0.8, 0.0, 0.8, "render" );
-				
+			{	
 				vk::PipelineStageFlags render_stage_flags( vk::PipelineStageFlagBits::eColorAttachmentOutput );
 				vk::PipelineStageFlags sampling_stage_flags( vk::PipelineStageFlagBits::eFragmentShader );
 				
@@ -150,28 +150,41 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 
 						if( r_handler.all_okay() )
 						{
-							/*
-							std::array<UINT64, timestamp_count> time_stamps;
+							std::array<UINT64, RenderQuery::TIMESTAMP_COUNT> time_stamps;
 							auto end_time = std::chrono::steady_clock::now();
-							result_handler << device.getQueryPoolResults( timestamp_pool, 0, timestamp_count, vk::ArrayProxy<UINT64>( time_stamps ), 0, vk::QueryResultFlagBits::e64 );
-							if( result_handler.all_okay() )
+							auto timestamp_pool = GraphicEngine::get_render_query().get_timestamp_pool();
+							if( timestamp_pool )
 							{
-								internal_render_time_frame.add_time_frame(
-									end_time - std::chrono::nanoseconds( UINT64( time_stamp_period * ( time_stamps[(UINT32)TimestampIds::AFTER_LIGHTNING] - time_stamps[(UINT32)TimestampIds::START] ) ) ),
-									end_time - std::chrono::nanoseconds( UINT64( time_stamp_period * ( time_stamps[(UINT32)TimestampIds::AFTER_LIGHTNING] - time_stamps[(UINT32)TimestampIds::AFTER_GEOMETRY] ) ) ),
-									0.8, 0.8, 0.0, 0.8, "geometry" );
+								DOUBLE timestamp_period = GraphicEngine::get_physical_device().getProperties().limits.timestampPeriod;
+								/*r_handler <<*/ device.getQueryPoolResults( timestamp_pool, 0, RenderQuery::TIMESTAMP_COUNT, vk::ArrayProxy<UINT64>( time_stamps ), 0, vk::QueryResultFlagBits::e64 );
+								if( r_handler.all_okay() )
+								{
+									time_collection_gpu.add_time_frame(
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::START] ) ) ),
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::AFTER_GEOMETRY] ) ) ),
+										0.8, 0.8, 0.0, 0.8, "geometry" );
 
-								internal_render_time_frame.add_time_frame(
-									end_time - std::chrono::nanoseconds( UINT64( time_stamp_period * ( time_stamps[(UINT32)TimestampIds::AFTER_LIGHTNING] - time_stamps[(UINT32)TimestampIds::AFTER_GEOMETRY] ) ) ),
-									end_time - std::chrono::nanoseconds( UINT64( time_stamp_period * ( time_stamps[(UINT32)TimestampIds::AFTER_LIGHTNING] - time_stamps[(UINT32)TimestampIds::AFTER_VECTOR] ) ) ),
-									0.8, 0.0, 0.0, 0.8, "vector" );
+									time_collection_gpu.add_time_frame(
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::AFTER_GEOMETRY] ) ) ),
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::AFTER_GLYPHS] ) ) ),
+										0.8, 0.0, 0.0, 0.8, "vector" );
 
-								internal_render_time_frame.add_time_frame(
-									end_time - std::chrono::nanoseconds( UINT64( time_stamp_period * ( time_stamps[(UINT32)TimestampIds::AFTER_LIGHTNING] - time_stamps[(UINT32)TimestampIds::AFTER_VECTOR] ) ) ),
-									end_time - std::chrono::nanoseconds( UINT64( time_stamp_period * ( time_stamps[(UINT32)TimestampIds::AFTER_LIGHTNING] - time_stamps[(UINT32)TimestampIds::AFTER_LIGHTNING] ) ) ),
-									0.8, 0.0, 0.8, 0.8, "shading" );
+									time_collection_gpu.add_time_frame(
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::AFTER_GLYPHS] ) ) ),
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::AFTER_SHADING] ) ) ),
+										0.8, 0.0, 0.8, 0.8, "shading" );
+
+									time_collection_gpu.add_time_frame(
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::BEFOR_POST] ) ) ),
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::AFTER_POST] ) ) ),
+										0.0, 0.0, 0.8, 0.8, "post" );
+
+									time_collection_gpu.add_time_frame(
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::BEFOR_OVERLAY] ) ) ),
+										end_time - std::chrono::nanoseconds( UINT64( timestamp_period * ( time_stamps[(UINT32)RenderQuery::TimeStampIds::END] - time_stamps[(UINT32)RenderQuery::TimeStampIds::AFTER_OVERLAY] ) ) ),
+										0.0, 0.8, 0.8, 0.8, "overlay" );
+								}
 							}
-							*/
 							r_handler << device.resetFences( { frame_end_fence } );
 							if( !r_handler.all_okay() ) return 1;
 						}
@@ -179,7 +192,6 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 				}
 
 			}
-			//render_loop_time_frame.end();
 		}
 
 		// free command buffers
@@ -188,6 +200,7 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 			free_buffer_ids.push_back( current_buffers.id );
 			submit_condition.notify_all();
 		}
+		time_collection_all.end_frame();
 	}
 	return 0;
 }

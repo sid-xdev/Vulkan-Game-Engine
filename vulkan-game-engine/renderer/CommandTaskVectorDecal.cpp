@@ -3,6 +3,7 @@
 #include <renderer/DescriptorSetManager.hpp>
 #include <renderer/GameGraphicEngine.hpp>
 #include <renderer/MemoryManagement.hpp>
+#include <renderer/RenderQuery.hpp>
 
 #include <logic/GameLogicEngine.hpp>
 #include <logic/Level.hpp>
@@ -87,9 +88,16 @@ bool noxcain::VectorDecalTask::record( const std::vector<vk::CommandBuffer>& buf
 			}
 		}
 	}
+
+	vk::QueryPool timestamp_pool = GraphicEngine::get_render_query().get_timestamp_pool();
+	if( timestamp_pool )
+	{
+		c_buffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::AFTER_GLYPHS );
+	}
+
 	r_handler << c_buffer.end();
 
-	//deferredCommandBuffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)TimestampIds::AFTER_VECTOR );
+	
 	return r_handler.all_okay();
 }
 

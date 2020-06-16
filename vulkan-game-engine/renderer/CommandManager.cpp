@@ -4,11 +4,13 @@
 #include <renderer/CommandTasks.hpp>
 #include <renderer/GameGraphicEngine.hpp>
 #include <renderer/GraphicEngineConstants.hpp>
+#include <renderer/MemoryManagement.hpp>
+#include <renderer/RenderQuery.hpp>
 
 #include <logic/GameLogicEngine.hpp>
 
 #include <resources/GameResourceEngine.hpp>
-#include <renderer/MemoryManagement.hpp>
+
 
 #include <tools/ResultHandler.hpp>
 #include <tools/TimeFrame.hpp>
@@ -71,6 +73,8 @@ bool noxcain::CommandManager::run_render_loop()
 			return false;
 		}
 
+
+
 		// validate all command buffer dependent objects 
 		record_time_frame.start_frame( 0.0, 0.6, 0.2, 1.0, "buffer" );
 
@@ -109,9 +113,14 @@ bool noxcain::CommandManager::run_render_loop()
 		auto resolution = g_settings.get_accumulated_resolution();
 		bool multi_sampling = g_settings.current_sample_count > 1;
 
+		vk::QueryPool timestamp_pool = GraphicEngine::get_render_query().get_timestamp_pool();
+
 		buffer_data.main_buffer.begin( vk::CommandBufferBeginInfo( vk::CommandBufferUsageFlagBits::eOneTimeSubmit ) );
 
-		//deferredCommandBuffer.resetQueryPool( timestamp_pool, 0, timestamp_count );
+		if( timestamp_pool )
+		{
+			buffer_data.main_buffer.resetQueryPool( timestamp_pool, 0, RenderQuery::TIMESTAMP_COUNT );
+		}
 
 		buffer_data.main_buffer.beginRenderPass( vk::RenderPassBeginInfo( deferred_render_pass.get_render_pass(), deferred_frame_buffer,
 																		  vk::Rect2D( vk::Offset2D( 0, 0 ), vk::Extent2D( resolution.width, resolution.height ) ),
@@ -177,6 +186,12 @@ bool noxcain::CommandManager::run_render_loop()
 				// overlay commands
 				cBuffer.executeCommands( { sub_command_buffers[2 * index + 1] } );
 				cBuffer.endRenderPass();
+				
+				if( timestamp_pool )
+				{
+					cBuffer.writeTimestamp( vk::PipelineStageFlagBits::eBottomOfPipe, timestamp_pool, (UINT32)RenderQuery::TimeStampIds::END );
+				}
+				
 				cBuffer.end();
 			}
 		}

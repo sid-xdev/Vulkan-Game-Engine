@@ -110,9 +110,9 @@ void noxcain::GraphicCore::createSwapChain( const vk::SwapchainKHR& oldSwapChain
 	presentationMode = vk::PresentModeKHR::eImmediate;
 	std::vector<vk::PresentModeKHR> wantedPresentModes =
 	{
-		vk::PresentModeKHR::eFifoRelaxed,
+		//vk::PresentModeKHR::eFifoRelaxed,
 		//vk::PresentModeKHR::eFifo,
-		//vk::PresentModeKHR::eMailbox,
+		vk::PresentModeKHR::eMailbox,
 	};
 
 	while( presentationMode == vk::PresentModeKHR::eImmediate && wantedPresentModes.size() > 0 )

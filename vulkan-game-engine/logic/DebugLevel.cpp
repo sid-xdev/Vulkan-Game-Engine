@@ -82,7 +82,7 @@ void noxcain::DebugLevel::initialize()
 	scroll_bar->set_slider_highlight_color( BASE_COLOR_FAC + 0.2, BASE_COLOR_FAC + 0.2, BASE_COLOR_FAC + 0.2 );
 	scroll_bar->set_slider_drag_color( BASE_COLOR_FAC + 0.4, BASE_COLOR_FAC + 0.4, BASE_COLOR_FAC + 0.4 );
 	scroll_bar->set_depth_level( 5 );
-	scroll_bar->make_scalable( 0.025 );
+	scroll_bar->make_scalable( 0.05 );
 	
 	scroll_bar->set_slider_size( 0.05 );
 	scroll_bar->set_position( 1.0 );
@@ -121,11 +121,6 @@ void noxcain::DebugLevel::update_level_logic( const std::chrono::nanoseconds& de
 	}
 
 	check_events( deltaTime );
-
-	if( scroll_bar )
-	{
-
-	}
 
 	const auto& end = performance_time_stamp - ( 1.0-scroll_bar->get_position() ) * PERFORMANCE_TIME_FRAME;
 	const auto& start_frame = end - scroll_bar->get_scale() * PERFORMANCE_TIME_FRAME;
@@ -173,27 +168,35 @@ noxcain::DebugLevel::~DebugLevel()
 
 void noxcain::DebugLevel::switch_on()
 {
-	TimeFrameCollector::deactivate();
 	std::unique_lock lock( visibilty_mutex );
 	performance_time_stamp = std::chrono::steady_clock::now();
-	is_on = true;
+	is_started = true;
+	TimeFrameCollector::activate();
 }
 
 void noxcain::DebugLevel::switch_off()
 {
+	std::unique_lock lock( visibilty_mutex );
 	if( initialized )
 	{
 		scroll_bar->set_slider_size( 0.05 );
 		scroll_bar->set_position( 1.0 );
 	}
-	TimeFrameCollector::activate();
-	std::unique_lock lock( visibilty_mutex );
+	TimeFrameCollector::deactivate();
 	is_on = false;
+	is_started = false;
 }
 
-bool noxcain::DebugLevel::on() const
+bool noxcain::DebugLevel::on()
 {
 	std::unique_lock lock( visibilty_mutex );
+	if( is_started && ( std::chrono::steady_clock::now() - performance_time_stamp ) >= PERFORMANCE_TIME_FRAME )
+	{
+		is_on = true;
+		is_started = false;
+		performance_time_stamp = std::chrono::steady_clock::now();
+		TimeFrameCollector::deactivate();
+	}
 	return is_on;
 }
 
