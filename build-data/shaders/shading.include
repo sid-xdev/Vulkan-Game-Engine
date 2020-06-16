@@ -1,0 +1,7 @@
+
+const vec3 global_light = vec3( 20.0, 25.0, 15.0 );
+
+vec3 shading( vec3 color, vec3 position, vec3 normal )
+{
+	return color * clamp( dot( normalize(global_light - position), normal ), 0.0, 1.0 );
+}

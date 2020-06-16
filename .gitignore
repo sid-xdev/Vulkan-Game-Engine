@@ -1,0 +1,11 @@
+# Visual Studio 2015/2017 cache/options directory
+.vs/
+
+# Visual Studio Code cache/options directory
+.vscode/
+
+# Auto generated shader header
+/vulkan-game-engine/shader/*.hpp
+
+# in source build camke stuff
+CMakeCache.txt
