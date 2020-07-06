@@ -23,7 +23,12 @@ noxcain::CommandManager::CommandManager()
 {
 }
 
-bool noxcain::CommandManager::run_render_loop()
+void noxcain::CommandManager::start_loop()
+{
+	comman_main_thread = std::thread( &CommandManager::run_render_loop, this );
+}
+
+void noxcain::CommandManager::run_render_loop()
 {	
 	ResultHandler<bool> r_handle_bool( true );
 	TimeFrameCollector record_time_frame( "Frame CPU" );
@@ -31,7 +36,7 @@ bool noxcain::CommandManager::run_render_loop()
 	if( !initial_transfer() )
 	{
 		//TODO error
-		return false;
+		return;
 	}
 
 	describe_deferred_render_pass();
@@ -45,8 +50,10 @@ bool noxcain::CommandManager::run_render_loop()
 
 	CommandSubmit submit;
 
-	while( LogicEngine::running() )
+	while( LogicEngine::is_running() && submit.check_swapchain() )
 	{
+		r_handle_bool.reset();
+		const auto start_time = std::chrono::steady_clock::now();
 		// validate all pre record and render objects with high priority 
 		// and with out dependencie to command buffers
 		{
@@ -55,7 +62,7 @@ bool noxcain::CommandManager::run_render_loop()
 			if( !validate_render_passes() )
 			{
 				//TODO error?
-				return false;
+				return;
 			}
 
 			// update render pass
@@ -70,7 +77,7 @@ bool noxcain::CommandManager::run_render_loop()
 		INT32 id = submit.get_free_buffer_id();
 		if( id < 0 )
 		{
-			return false;
+			return;
 		}
 
 
@@ -86,7 +93,7 @@ bool noxcain::CommandManager::run_render_loop()
 		// check for frame buffers
 		if( !validate_frame_buffers() )
 		{
-			return false;
+			return;
 		}
 
 		// update frame buffer
@@ -98,7 +105,7 @@ bool noxcain::CommandManager::run_render_loop()
 		// check own command buffers
 		if( !validate_command_buffers( id ) )
 		{
-			return false;
+			return;
 		}
 
 		// start master recording
@@ -124,7 +131,7 @@ bool noxcain::CommandManager::run_render_loop()
 
 		buffer_data.main_buffer.beginRenderPass( vk::RenderPassBeginInfo( deferred_render_pass.get_render_pass(), deferred_frame_buffer,
 																		  vk::Rect2D( vk::Offset2D( 0, 0 ), vk::Extent2D( resolution.width, resolution.height ) ),
-																		  deferred_clear_colors.size(), deferred_clear_colors.data() ), vk::SubpassContents::eSecondaryCommandBuffers );
+																		  UINT32( deferred_clear_colors.size() ), deferred_clear_colors.data() ), vk::SubpassContents::eSecondaryCommandBuffers );
 
 		// geometry commands
 		r_handle_bool << geometry_task.wait_for_finish();
@@ -176,7 +183,7 @@ bool noxcain::CommandManager::run_render_loop()
 				const vk::CommandBuffer cBuffer = buffer_data.finalize_command_buffers[index];
 				cBuffer.begin( vk::CommandBufferBeginInfo( vk::CommandBufferUsageFlags() ) );
 				cBuffer.beginRenderPass( vk::RenderPassBeginInfo(
-					finalize_render_pass.get_render_pass(), finalize_frame_buffers[index], surfaceRectangle, finalize_clear_colors.size(), finalize_clear_colors.data() ),
+					finalize_render_pass.get_render_pass(), finalize_frame_buffers[index], surfaceRectangle, UINT32( finalize_clear_colors.size() ), finalize_clear_colors.data() ),
 					vk::SubpassContents::eSecondaryCommandBuffers );
 
 				// post commands
@@ -199,8 +206,11 @@ bool noxcain::CommandManager::run_render_loop()
 		submit.set_newest_command_buffer( buffer_data );
 
 		record_time_frame.end_frame();
+
+		const auto end_time = std::chrono::steady_clock::now();
+		LogicEngine::set_cpu_cycle_duration( end_time - start_time );
 	}
-	return true;
+	return;
 }
 
 bool noxcain::CommandManager::validate_render_passes()
@@ -292,7 +302,7 @@ bool noxcain::CommandManager::validate_frame_buffers()
 				return false;
 			}
 
-			deferred_frame_buffer = r_handle << device.createFramebuffer( vk::FramebufferCreateInfo( vk::FramebufferCreateFlags(), deferred_render_pass.get_render_pass(), views.size(), views.data(), extent.width, extent.height, extent.depth ) );
+			deferred_frame_buffer = r_handle << device.createFramebuffer( vk::FramebufferCreateInfo( vk::FramebufferCreateFlags(), deferred_render_pass.get_render_pass(), UINT32( views.size() ), views.data(), extent.width, extent.height, extent.depth ) );
 
 			if( deferred_clear_colors.size() != attachment_count )
 			{
@@ -329,6 +339,11 @@ bool noxcain::CommandManager::validate_frame_buffers()
 				{
 					device.destroyFramebuffer( frame_buffer );
 				}
+				finalize_frame_buffers.clear();
+			}
+			else
+			{
+				return false;
 			}
 		}
 
@@ -356,7 +371,7 @@ bool noxcain::CommandManager::validate_frame_buffers()
 				finalize_clear_colors.resize( attachment_count, vk::ClearColorValue() );
 			}
 
-			auto frame_buffer = r_handle << device.createFramebuffer( vk::FramebufferCreateInfo( vk::FramebufferCreateFlags(), finalize_render_pass.get_render_pass(), views.size(), views.data(), extent.width, extent.height, 1 ) );
+			auto frame_buffer = r_handle << device.createFramebuffer( vk::FramebufferCreateInfo( vk::FramebufferCreateFlags(), finalize_render_pass.get_render_pass(), UINT32( views.size() ), views.data(), extent.width, extent.height, 1 ) );
 			if( !r_handle.all_okay() )
 			{
 				return false;
@@ -692,8 +707,11 @@ void noxcain::CommandManager::prepare_main_loop()
 */
 noxcain::CommandManager::~CommandManager()
 {
-	//TODO clean up
 	LogicEngine::finish();
+	if( comman_main_thread.joinable() )
+	{
+		comman_main_thread.join();
+	}
 
 	vk::Device device = GraphicEngine::get_device();
 	if( device )

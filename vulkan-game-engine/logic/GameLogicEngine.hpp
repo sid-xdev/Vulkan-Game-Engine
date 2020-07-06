@@ -33,8 +33,8 @@ namespace noxcain
 
 	struct CursorPosition
 	{
-		INT32 x;
-		INT32 y;
+		INT32 x = 0;
+		INT32 y = 0;
 	};
 
 	struct GraphicSettings
@@ -93,11 +93,34 @@ namespace noxcain
 		static void update();
 		static void finish();
 
-		static bool running();
+		static void pause();
+		static void resume();
+
+		static bool is_running();
 
 		static void show_performance_overlay();
 
 		static CursorPosition get_cursor_position();
+
+		static void set_cpu_cycle_duration( std::chrono::nanoseconds duration )
+		{
+			engine->cpu_cycle_duration = duration;
+		}
+
+		static void set_gpu_cycle_duration( std::chrono::nanoseconds duration )
+		{
+			engine->gpu_cycle_duration = duration;
+		}
+
+		static std::chrono::nanoseconds get_cpu_cycle_duration()
+		{
+			return engine->cpu_cycle_duration;
+		}
+
+		static std::chrono::nanoseconds get_gpu_cycle_duration()
+		{
+			return engine->gpu_cycle_duration;
+		}
 
 	private:
 		//singelton
@@ -108,9 +131,12 @@ namespace noxcain
 		UINT32 logic_update();
 		std::condition_variable status_condition;
 		std::thread logic_thread;
-
+		
 		//time
 		std::chrono::time_point<std::chrono::steady_clock> last_update_time_point;
+		std::chrono::nanoseconds gpu_cycle_duration = std::chrono::seconds( 1 );
+		std::chrono::nanoseconds cpu_cycle_duration = std::chrono::seconds( 1 );
+		bool time_start_reset = true;
 
 		//levels
 		std::unique_ptr<GameLevel> current_level;
@@ -124,14 +150,15 @@ namespace noxcain
 		CursorPosition cursor_position;
 
 		//game status
-		std::mutex status_mutex;
+		mutable std::mutex status_mutex;
 		enum class Status
 		{
 			DORMANT,
 			UPDATING,
+			PAUSED,
 			EXIT
 		} status = Status::DORMANT;
-
+		
 		// special graphic settings sync
 		std::mutex settings_mutex;
 		GraphicSettings graphic_settings;

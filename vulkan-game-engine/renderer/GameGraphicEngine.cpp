@@ -45,8 +45,8 @@ void noxcain::GraphicEngine::initialize()
 	render_query.reset( new RenderQuery() );
 }
 
-bool noxcain::GraphicEngine::run( const PresentationSurface& os_surface )
-{
+bool noxcain::GraphicEngine::run( std::shared_ptr<PresentationSurface> os_surface )
+{	
 	if( engine->core->initialize( os_surface ) )
 	{
 		bool successful_initialization = false;
@@ -65,7 +65,8 @@ bool noxcain::GraphicEngine::run( const PresentationSurface& os_surface )
 				}
 			}
 		}
-		return engine->commands->run_render_loop();
+		engine->commands->start_loop();
+		return true;
 	}
 	return false;
 }
@@ -98,6 +99,11 @@ vk::Format noxcain::GraphicEngine::get_swapchain_image_format()
 vk::ImageView noxcain::GraphicEngine::get_swapchain_image_view( std::size_t image_index )
 {
 	return engine->core->getImageView( image_index );
+}
+
+bool noxcain::GraphicEngine::recreate_swapchain( bool recreate_surface )
+{
+	return engine->core->recreate_swapchain( recreate_surface );
 }
 
 noxcain::MemoryManager& noxcain::GraphicEngine::get_memory_manager()
@@ -138,6 +144,11 @@ vk::ShaderModule noxcain::GraphicEngine::get_shader( ComputeShaderIds shader_id 
 vk::ShaderModule noxcain::GraphicEngine::get_shader( VertexShaderIds shader_id )
 {
 	return engine->shader->get( shader_id );
+}
+
+void noxcain::GraphicEngine::finish()
+{
+	engine->core->close_surface_base();
 }
 
 noxcain::GraphicEngine::GraphicEngine() : core( new GraphicCore() )

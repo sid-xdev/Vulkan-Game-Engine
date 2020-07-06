@@ -20,7 +20,7 @@ namespace noxcain
 		std::vector<FLOAT32> leftBearings;
 		//std::vector<FLOAT32> advanceHeights;
 		//std::vector<FLOAT32> topBearings;
-		std::vector<UINT16>  glyphIndices;
+		std::vector<UINT32>  glyphIndices;
 
 		std::vector<FLOAT32> glyphCorners;
 		std::vector<std::vector<FLOAT32>> pointMaps;
@@ -46,7 +46,7 @@ namespace noxcain
 		template<typename T>
 		T read()
 		{
-			T value = 0;
+			T value;
 			constexpr UINT32 size = sizeof( T );
 			font.read( reinterpret_cast<char*>( &value ), size );
 
@@ -54,8 +54,8 @@ namespace noxcain
 			{
 				for( UINT32 index = 0; index < size / 2; ++index )
 				{
-					unsigned char* bytes = reinterpret_cast<unsigned char*>( &value );
-					unsigned char byte = bytes[index];
+					BYTE* bytes = reinterpret_cast<BYTE*>( &value );
+					BYTE byte = bytes[index];
 					bytes[index] = bytes[size - 1 - index];
 					bytes[size - 1 - index] = byte;
 				}

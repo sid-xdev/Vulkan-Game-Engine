@@ -15,7 +15,7 @@ std::mutex noxcain::ResourceEngine::resource_mutex;
 void noxcain::ResourceEngine::read_font( const std::vector<std::string>& font_paths )
 {
 	std::vector<FontEngine> fonts( font_paths.size() );
-	UINT32 total_glyph_count = 0;
+	UINT32 total_glyph_count = 1;
 	for( std::size_t font_index = 0; font_index < fonts.size(); ++font_index )
 	{
 		fonts[font_index].readFont( font_paths[font_index] );
@@ -26,7 +26,93 @@ void noxcain::ResourceEngine::read_font( const std::vector<std::string>& font_pa
 	const std::size_t vertex_buffer_resource_id = addSubResource( vertex_buffer_size, GameSubResource::SubResourceType::eVertexBuffer );
 	std::vector<BYTE> vertex_buffer( vertex_buffer_size );
 
-	std::size_t font_offset = 0;
+	//in code fallback font
+	{
+		std::vector<FontResource::CharacterInfo> chars = { { 0, 1.0F } };
+
+		FLOAT32* memory = reinterpret_cast<FLOAT32*>( vertex_buffer.data() );
+		memory[0] = 0.0F;
+		memory[1] = 1.0F;
+
+		memory[2] = 1.0F;
+		memory[3] = 1.0F;
+
+		memory[4] = 0.0F;
+		memory[5] = 0.0F;
+
+		memory[6] = 1.0F;
+		memory[7] = 0.0F;
+
+		std::vector<BYTE> offsets_buffer( 8 * sizeof( UINT32 ) );
+		UINT32* offset_map = reinterpret_cast<UINT32*>( offsets_buffer.data() );
+		offset_map[0] = 2;
+		offset_map[1] = 4;
+		offset_map[2] = 2;
+		offset_map[3] = 6;
+		offset_map[4] = 8;
+		offset_map[5] = 2;
+		offset_map[6] = 20;
+		offset_map[7] = 14;
+
+		const std::size_t offsets_resource_id = addSubResource( offsets_buffer.size(), GameSubResource::SubResourceType::eStorageBuffer );
+		std::vector<std::size_t> offset_ids = { offsets_resource_id };
+		subresources[offsets_resource_id].setData( std::move( offsets_buffer ) );
+
+		std::vector<BYTE> point_buffer( 26 * sizeof( FLOAT32 ) );
+		FLOAT32* point_map = reinterpret_cast<FLOAT32*>( point_buffer.data() );
+		point_map[0] = 1.0F;
+		point_map[1] = 1.0F;
+		
+		//curve x 0
+		point_map[2] = 0.1F;
+		point_map[3] = 0.0F;
+		
+		point_map[4] = 0.5F;
+		point_map[5] = 0.0F;
+		
+		point_map[6] = 0.0F;
+		point_map[7] = 0.0F;
+
+		//curve x 1
+		point_map[8] = 0.0F;
+		point_map[9] = 1.0F;
+
+		point_map[10] = 0.5F;
+		point_map[11] = 1.0F;
+		
+		point_map[12] = 1.0F;
+		point_map[13] = 1.0F;
+
+		//curve y 0
+		point_map[14] = 0.0F;
+		point_map[15] = 0.0F;
+		
+		point_map[16] = 0.0F;
+		point_map[17] = 0.5F;
+		
+		point_map[18] = 0.0F;
+		point_map[19] = 1.0F;
+
+		//curve y 1
+		point_map[20] = 1.0F;
+		point_map[21] = 1.0F;
+		
+		point_map[22] = 1.0F;
+		point_map[23] = 0.5F;
+		
+		point_map[24] = 1.0F;
+		point_map[25] = 0.0F;
+
+		const std::size_t point_resource_id = addSubResource( point_buffer.size(), GameSubResource::SubResourceType::eStorageBuffer );
+		std::vector<std::size_t> point_ids = { point_resource_id };
+		subresources[point_resource_id].setData( std::move( point_buffer ) );
+
+		font_resources.emplace_back( 0, std::vector<UINT32>(), std::move( chars ), 1.0, 0.0, 0.0,
+									 std::move( offset_ids ), std::move( point_ids ), vertex_buffer_resource_id );
+		resource_limits.font_count = 1;
+	}
+
+	std::size_t font_offset = 1;
 
 	for( const FontEngine& fe : fonts )
 	{
@@ -94,9 +180,10 @@ void noxcain::ResourceEngine::read_font( const std::vector<std::string>& font_pa
 				subresources[id].setData( std::move( mapBuffer ) );
 			}
 
-			font_resources.emplace_back( font_offset, std::move( unicode ), std::move( chars ), fe.ascender, fe.descender, fe.lineGap,
-										 std::move( offset_ids ), std::move( pointIds ), vertex_buffer_resource_id );
-
+			font_resources.push_back( FontResource( font_offset, std::move( unicode ), std::move( chars ),
+													fe.ascender, fe.descender, fe.lineGap, 
+													std::move( offset_ids ), std::move( pointIds ),
+													vertex_buffer_resource_id ) );
 			resource_limits.font_count++;
 
 			font_offset += current_glyph_count;
@@ -295,13 +382,12 @@ std::size_t noxcain::ResourceEngine::addSubResource( std::size_t resourceSize, G
 
 noxcain::ResourceEngine::ResourceEngine()
 {
-
 	read_font( 
 		{
 			"Assets/Fonts/OpenSans-Regular.ttf",
 			"Assets/Fonts/28 Days Later.ttf",
 			"Assets/Fonts/Ornaments Salad.otf",
-			"Assets/Fonts/zenda.ttf"
+			//"Assets/Fonts/zenda.ttf"
 		} );
 	read_hex_geometry();
 }

@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cmath>
 
-
 void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 {
 	font.seekg( offset );

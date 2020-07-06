@@ -39,6 +39,11 @@ namespace noxcain
 			frame.set_color( red, green, blue, alpha );
 		}
 
+		void set_inactive_text_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha = 1.0 )
+		{
+			inactive_text_color = { red, green, blue, alpha };
+		}
+
 		void activate();
 		void deactivate();
 

@@ -21,6 +21,8 @@
 noxcain::MineSweeperLevel::MineSweeperLevel() :
 	//fieldOrientationSpline( std::make_unique<CubicSpline>() ),
 	camera_distance_label( std::make_unique<VectorText2D>( vector_label_list ) ),
+	cpu_cycle_label( std::make_unique<VectorText2D>( vector_label_list ) ),
+	gpu_cycle_label( std::make_unique<VectorText2D>( vector_label_list ) ),
 	debug_button( std::make_unique<BaseButton>( vector_label_list, color_label_list ) ),
 	switch_font_button( std::make_unique<BaseButton>( vector_label_list, color_label_list ) )
 {
@@ -29,8 +31,21 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 	geometry_renderables.emplace_back( geometry_list );
 	vector_label_renderables.emplace_back( vector_label_list );
 	
+	//camera distance label
 	camera_distance_label->set_top_anchor( get_screen_root() );
 	camera_distance_label->set_right_anchor( get_screen_root() );
+	camera_distance_label->set_anchor( get_screen_root(), HorizontalAnchorType::RIGHT, VerticalAnchorType::TOP, HorizontalAnchorType::RIGHT, VerticalAnchorType::TOP );
+	camera_distance_label->get_text().set_size( 24 );
+
+	//fps displays
+	cpu_cycle_label->set_top_anchor( get_screen_root() );
+	gpu_cycle_label->set_vertical_anchor( VerticalAnchorType::TOP, *cpu_cycle_label, VerticalAnchorType::BOTTOM );
+
+	cpu_cycle_label->set_left_anchor( get_screen_root() );
+	gpu_cycle_label->set_left_anchor( get_screen_root() );
+
+	cpu_cycle_label->get_text().set_size( 24 );
+	gpu_cycle_label->get_text().set_size( 24 );
 
 	setup_events();
 	grid = std::make_unique<SceneGraphNode>();
@@ -38,8 +53,7 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 
 	setup_level();
 
-	camera_distance_label->set_anchor( get_screen_root(), HorizontalAnchorType::RIGHT, VerticalAnchorType::TOP, HorizontalAnchorType::RIGHT, VerticalAnchorType::TOP );
-	camera_distance_label->get_text().set_size( 24 );
+	
 
 	// add debug button
 	get_screen_root().add_branch( *debug_button );
@@ -51,6 +65,7 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 	debug_button->set_background_color( 0.4F, 0.4F, 0.4F );
 	debug_button->set_highlight_color( 0.6F, 0.6F, 0.6F, 1.0F );
 	debug_button->set_active_color( 0.8F, 0.8F, 0.8F );
+	debug_button->get_text_element().set_color( 0.0F, 0.0F, 0.0F );
 	debug_button->get_text_element().set_utf8( "PROFIL" );
 	debug_button->get_text_element().set_size( 24 );
 	debug_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::FULL );
@@ -76,6 +91,7 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 	switch_font_button->set_background_color( 0.4F, 0.4F, 0.4F );
 	switch_font_button->set_highlight_color( 0.6F, 0.6F, 0.6F, 1.0F );
 	switch_font_button->set_active_color( 0.8F, 0.8F, 0.8F );
+	switch_font_button->get_text_element().set_color( 0.0F, 0.0F, 0.0F );
 	switch_font_button->get_text_element().set_utf8( "SWITCH FONT" );
 	switch_font_button->get_text_element().set_size( 24 );
 	switch_font_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::FULL );
@@ -129,44 +145,51 @@ void noxcain::MineSweeperLevel::setup_level()
 	
 	UINT32 count = 0;
 
-	CubicSpline curve(
+	NxVector3D end_point( 0, 30, 0 );
+	splines.emplace_back( CubicSpline(
 		{
-			NxVector3D( 0, -40, 0 ), NxVector3D( 0, -40, 20 ),
+			NxVector3D( 0, -30, 0 ), NxVector3D( 30, -20, 0 ),
 
-			NxVector3D( 0, -60, 20 ), NxVector3D( 0, -60, 40 ),
+			NxVector3D( 30, -10, 0 ), NxVector3D( 0, 0, 0 ),
 
-			NxVector3D( 0, -60, 40 ), NxVector3D( 0, -40, 60 ),
-
+			NxVector3D( -30, 20, 0 ), end_point,
+/*
 			NxVector3D( 0, -20, 55 ), NxVector3D( 0, 0, 55 ),
 
 			NxVector3D( 0, 20, 60 ), NxVector3D( 0, 40, 60 ),
 
-			NxVector3D( 0, 40, 20 ), NxVector3D( 0, 40, 0 )
-		} );
-	
-	DOUBLE curve_length = curve.get_length();;
+			NxVector3D( 0, 40, 20 ), NxVector3D( 0, 40, 0 )*/
+		} ) );
+
+	auto& spline = splines.back();
+	DOUBLE curve_length = spline.get_length();;
 	DOUBLE step_width = HexField::get_object_space_bounding_box().get_height();
 
 	step_width = step_width / curve_length;
 
 	DOUBLE current_step = 0;
 
+	//hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
+
+	hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
+	/*
 	while( current_step <= 1.0 )
 	{
-		hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
-		auto& currentField = hex_fields.back();
+		
+		auto& current_hex = hex_fields.back();
 
-		const NxVector3D x_axis( 1.0, 0.0, 0.0 );
-		const NxVector3D& y_axis = curve.get_direction( current_step );
+		const NxVector3D y_axis = spline.get_direction( current_step );
+		const NxVector3D z_axis = ( end_point - spline.get_position( current_step ) ).cross( y_axis ).normalize();
+		const NxVector3D x_axis = y_axis.cross( z_axis ).normalize();
 
-		NxMatrix4x4 position( x_axis, y_axis, x_axis.cross( y_axis ).normalize(), curve.get_position( current_step ) );
+		NxMatrix4x4 position( x_axis, y_axis, z_axis, spline.get_position( current_step ) );
 
-		currentField->set_local_matrix( position.translation( NxVector3D( 0, 0, -HexField::get_object_space_bounding_box().get_depth() ) ) );
-		currentField->set_mine_number( count++ );
+		current_hex->set_local_matrix( position.translation( NxVector3D( 0, 0, -HexField::get_object_space_bounding_box().get_depth() ) ) );
+		current_hex->set_mine_number( count++ );
 
 		current_step += step_width;
 	}
-
+	*/
 	//NxMatrix4x4 centering = NxMatrix4x4().translation( { -0.5 * rowLength + hexSideLength,0,0 } );
 	//for( std::size_t index = 0; index < 11/*index < UINT32( 0.5 * rowCount + rowCount % 2 + 2 )*/; ++index )
 	/*	
@@ -177,7 +200,7 @@ void noxcain::MineSweeperLevel::setup_level()
 			//trans.translation( { line * 1.5 * hexSideLength, 0, 0 } );
 			
 			hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
-			auto& currentField = hex_fields.back();
+			auto& current_hex = hex_fields.back();
 			
 			
 			
@@ -187,10 +210,10 @@ void noxcain::MineSweeperLevel::setup_level()
 
 			NxMatrix4x4 position( y_axis.cross( x_axis ).normalize(), y_axis, x_axis, curve.get_position( step_width * index ) );
 
-			currentField->set_local_matrix( position );
-			//currentField->set_local_matrix( centering * trans * NxMatrix4x4().rotation( { 1,0,0 }, -0.5*PI + lineAngle*(index + ( line % 2 ) * 0.5 - 1 ) ) * NxMatrix4x4().translation( { 0,0,realRadius + 0.5 } ) );
-			currentField->set_mine_number( count++ );
-			//currentField->set_mine_neighbor_count( index % 7 );
+			current_hex->set_local_matrix( position );
+			//current_hex->set_local_matrix( centering * trans * NxMatrix4x4().rotation( { 1,0,0 }, -0.5*PI + lineAngle*(index + ( line % 2 ) * 0.5 - 1 ) ) * NxMatrix4x4().translation( { 0,0,realRadius + 0.5 } ) );
+			current_hex->set_mine_number( count++ );
+			//current_hex->set_mine_neighbor_count( index % 7 );
 		}
 	}
 	*/
@@ -198,7 +221,7 @@ void noxcain::MineSweeperLevel::setup_level()
 	camera_space_near = 0.5*radius;
 	camera_space_far = camera_space_near + rowLength;
 
-	activeCameraPosition = NxMatrix4x4().translation( { 0,0, 0.5* rowLength + camera_space_near + hexSideLength } );
+	//activeCameraPosition = NxMatrix4x4().translation( { 0,0, /*0.5* rowLength + camera_space_near + hexSideLength*/50 } );
 }
 
 noxcain::KeyEventHandler& noxcain::MineSweeperLevel::get_key( KeyEvents key )
@@ -289,6 +312,11 @@ void noxcain::MineSweeperLevel::check_events( const std::chrono::nanoseconds& de
 	{
 		camera_horizontal_angle -= milliseconds * 0.001;
 	}
+
+	if( get_key( KeyEvents::ROTATE_CAMERA_RIGHT ).is_pushed() )
+	{
+		camera_horizontal_angle -= milliseconds * 0.001;
+	}
 }
 
 void noxcain::MineSweeperLevel::update_camera()
@@ -305,7 +333,7 @@ void noxcain::MineSweeperLevel::update_camera()
 	camera_screen_height = camera_screen_width / ratio;
 	DOUBLE right = 0.5 * camera_screen_width;
 	DOUBLE top = 0.5 * -camera_screen_height;
-
+	
 	activeCameraPerspective.getColumn( 0 )[0] = camera_space_near / right;
 	activeCameraPerspective.getColumn( 1 )[1] = camera_space_near / top;
 	
@@ -322,30 +350,34 @@ void noxcain::MineSweeperLevel::update_camera()
 
 void noxcain::MineSweeperLevel::update_level_logic( const std::chrono::nanoseconds& deltaTime )
 {
+	cycle_display_wait_time += deltaTime;
+	if( cycle_display_wait_time > CYCLE_TIME_DISPLAY_REFRESH_RATE )
+	{
+		cpu_cycle_label->get_text().set_utf8( "CPU: " + std::to_string( std::chrono::seconds( 1 ) / LogicEngine::get_cpu_cycle_duration() ) + " fps" );
+		gpu_cycle_label->get_text().set_utf8( "GPU: " + std::to_string( std::chrono::seconds( 1 ) / LogicEngine::get_gpu_cycle_duration() ) + " fps" );
+		cycle_display_wait_time = std::chrono::nanoseconds( 0 );
+	}
+	DOUBLE xx = 0.5*std::chrono::duration_cast<std::chrono::duration<DOUBLE>>( deltaTime ).count();
+	progress += xx;
+	while( progress > 1.0 ) progress -= 1.0;
+
 	check_events( deltaTime );
 	update_camera();
-	
+
 	camera_distance_label->get_text().set_utf8( std::to_string( camera_center_distance ) );
-	/*
-	DOUBLE linePercent = currentAngle / lineAngle;
-	startIndex -= linePercent;
-	if( startIndex < 0 )
-	{
-		startIndex = 0;
-		currentAngle = lineAngle;
-	}
-	else
-	{
-		currentAngle = ( linePercent - INT32( linePercent ) ) * lineAngle;
-	}
 
-	grid->set_local_matrix( NxMatrix4x4().rotation( { 1.0, 0.0, 0.0 }, currentAngle ) );
+	auto& current_hex = hex_fields.back();
+	auto& spline = splines.back();
 
-	std::size_t index = 0;
-	for( auto& hex : hex_fields )
-	{
-		//hex->set_mine_neighbor_count( std::size_t( ( startIndex * std::size_t(columnCount) + index++ ) / columnCount )%7 );
-	}
-	*/
+	auto end_point = spline.get_position( 1.0 );
+
+	const NxVector3D y_axis = spline.get_direction( progress );
+	const NxVector3D z_axis = NxVector3D( 1.0, 0.0, 0.0 ).cross( y_axis ).normalize();
+	const NxVector3D x_axis = y_axis.cross( z_axis ).normalize();
+
+	NxMatrix4x4 position( x_axis, y_axis, z_axis, spline.get_position( progress ) );
+
+	current_hex->set_local_matrix( position.translation( NxVector3D( 0, 0, -HexField::get_object_space_bounding_box().get_depth() ) ) );
+	current_hex->set_mine_number( progress * 100.0 );
 }
 

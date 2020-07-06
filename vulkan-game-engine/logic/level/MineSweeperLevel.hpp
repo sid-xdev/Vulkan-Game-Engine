@@ -2,11 +2,11 @@
 #include <memory>
 #include <any>
 #include <logic/Level.hpp>
+#include <math/Spline.hpp>
 
 
 namespace noxcain
 {	
-	class CubicSpline;
 	class BaseButton;
 
 	class MineSweeperLevel : public GameLevel
@@ -16,6 +16,9 @@ namespace noxcain
 		Renderable<GeometryObject>::List geometry_list;
 		Renderable<RenderableQuad2D>::List color_label_list;
 		Renderable<VectorText2D>::List vector_label_list;
+
+		std::vector<CubicSpline> splines;
+		DOUBLE progress = 0.0;
 
 		class HexField;
 		enum class KeyEvents : std::size_t
@@ -44,7 +47,7 @@ namespace noxcain
 		DOUBLE camera_space_near = 0.0;
 		DOUBLE camera_space_far = 0.0;
 
-		DOUBLE camera_center_distance = 90.0;
+		DOUBLE camera_center_distance = 50.0;
 		DOUBLE camera_vertical_angle = 0.0;
 		DOUBLE camera_horizontal_angle = 0.0;
 
@@ -68,6 +71,14 @@ namespace noxcain
 		void setup_level();
 
 		std::unique_ptr<VectorText2D> camera_distance_label;
+
+		//FPS DISPLAY
+		constexpr static std::chrono::nanoseconds CYCLE_TIME_DISPLAY_REFRESH_RATE = std::chrono::seconds( 1 );
+		std::chrono::nanoseconds cycle_display_wait_time = std::chrono::nanoseconds::zero();
+		std::unique_ptr<VectorText2D> cpu_cycle_label;
+		std::unique_ptr<VectorText2D> gpu_cycle_label;
+
+		//TEST BUTTONS
 		std::unique_ptr<BaseButton> debug_button;
 		std::unique_ptr<BaseButton> switch_font_button;
 

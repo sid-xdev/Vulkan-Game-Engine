@@ -25,10 +25,12 @@ namespace noxcain
 
 		CommandManager();
 
-		bool run_render_loop();
+		void start_loop();
 		
 	private:
-		
+		void run_render_loop();
+		std::thread comman_main_thread;
+
 		void describe_deferred_render_pass();
 		void describe_finalize_render_pass();
 		

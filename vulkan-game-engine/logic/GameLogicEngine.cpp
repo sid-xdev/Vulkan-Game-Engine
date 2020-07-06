@@ -24,8 +24,6 @@ noxcain::LogicEngine::LogicEngine()
 
 	graphic_settings.current_sample_count = 1;
 	graphic_settings.current_super_sampling_factor = 1.0F;
-
-	logic_thread = std::thread( &LogicEngine::logic_update, this );
 }
 
 noxcain::UINT32 noxcain::LogicEngine::logic_update()
@@ -36,16 +34,13 @@ noxcain::UINT32 noxcain::LogicEngine::logic_update()
 		debug_level = std::make_unique<DebugLevel>();
 	}
 	
-	while( running() )
+	std::unique_lock status_lock( status_mutex );
+	while( status != Status::EXIT )
 	{
-		std::unique_lock status_lock( status_mutex );
 		status_condition.wait( status_lock, [this]() { return status == Status::UPDATING || status == Status::EXIT; } );
 
 		if( status == Status::UPDATING )
 		{
-			auto time_now = std::chrono::steady_clock::now();
-			std::chrono::nanoseconds deltaTime = ( std::chrono::duration_cast<std::chrono::nanoseconds>( time_now - last_update_time_point ) );
-
 			std::vector<KeyEvent> old_key_events;
 			std::vector<RegionalKeyEvent> old_region_key_events;
 			{
@@ -58,16 +53,27 @@ noxcain::UINT32 noxcain::LogicEngine::logic_update()
 				}
 			}
 
+			if( time_start_reset )
+			{
+				last_update_time_point = std::chrono::steady_clock::now();
+				time_start_reset = false;
+			}
+			auto time_now = std::chrono::steady_clock::now();
+			std::chrono::nanoseconds deltaTime = ( std::chrono::duration_cast<std::chrono::nanoseconds>( time_now - last_update_time_point ) );
+			last_update_time_point = time_now;
+
+			//debug level is just an overlay so it dont get any own key events
+			current_level->update_key_events( old_key_events );
+
 			if( debug_level->on() )
 			{
-				debug_level->update( deltaTime, old_key_events, old_region_key_events );
+				debug_level->update_logic( deltaTime, old_region_key_events );
 			}
 			else
 			{
-				current_level->update( deltaTime, old_key_events, old_region_key_events );
+				current_level->update_logic( deltaTime, old_region_key_events );
 			}
-			last_update_time_point = time_now;
-			
+
 			if( current_level->get_level_status() == GameLevel::Status::FINISHED )
 			{
 				finish_game();
@@ -186,6 +192,11 @@ void noxcain::LogicEngine::set_event( InputEventTypes type, INT32 param1, INT32 
 void noxcain::LogicEngine::update()
 {
 	std::unique_lock lock( engine->status_mutex );
+	if( engine->logic_thread.get_id() == std::thread::id() )
+	{
+		engine->logic_thread = std::thread( &LogicEngine::logic_update, engine.get() );
+	}
+
 	if( engine->status == Status::DORMANT )
 	{
 		engine->status = Status::UPDATING;
@@ -205,9 +216,37 @@ void noxcain::LogicEngine::finish()
 	}
 }
 
-bool noxcain::LogicEngine::running()
+void noxcain::LogicEngine::pause()
 {
 	std::unique_lock lock( engine->status_mutex );
+	if( engine->status != Status::EXIT )
+	{
+		engine->status = Status::PAUSED;
+		engine->time_start_reset = true;
+		engine->status_condition.notify_all();
+	}
+}
+
+void noxcain::LogicEngine::resume()
+{
+	std::unique_lock lock( engine->status_mutex );
+	if( engine->status != Status::EXIT )
+	{
+		engine->status = Status::DORMANT;
+		engine->status_condition.notify_all();
+	}
+}
+
+bool noxcain::LogicEngine::is_running()
+{
+	std::unique_lock lock( engine->status_mutex );
+	if( engine->status == Status::PAUSED )
+	{
+		engine->status_condition.wait( lock, []() -> bool
+		{
+			return ( engine->status != Status::PAUSED || engine->status == Status::EXIT );
+		} );
+	}
 	return engine->status != Status::EXIT;
 }
 

@@ -10,7 +10,7 @@ noxcain::DescriptorSetLayoutDescription::DescriptorSetLayoutDescription()
 bool noxcain::DescriptorSetLayoutDescription::add_binding_unlocked( UINT32 binding, vk::DescriptorType descriptor_type, UINT32 descriptor_count, vk::ShaderStageFlags stage_flags, const std::vector<std::shared_ptr<SamplerDescription>>& immutable_samplers )
 {
 	if( descriptor_count > 0 && ( immutable_samplers.empty() ||
-		immutable_samplers.size() == descriptor_count && ( descriptor_type == vk::DescriptorType::eSampler || descriptor_type == vk::DescriptorType::eCombinedImageSampler ) ) )
+		( immutable_samplers.size() == descriptor_count && ( descriptor_type == vk::DescriptorType::eSampler || descriptor_type == vk::DescriptorType::eCombinedImageSampler ) ) ) )
 	{
 		bindings.emplace_back( binding, descriptor_type, descriptor_count, stage_flags, immutable_samplers );
 		return true;

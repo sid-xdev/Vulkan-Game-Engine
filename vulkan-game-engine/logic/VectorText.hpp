@@ -63,7 +63,7 @@ namespace noxcain
 
 		void set_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha = 1.0 );
 		void set_color( const std::array<FLOAT32, 4>& color );
-		const std::array<BYTE, 4>& get_color() const
+		const std::array<FLOAT32, 4>& get_color() const
 		{
 			return colors[0];
 		}
@@ -95,6 +95,6 @@ namespace noxcain
 		DOUBLE max_width = 0;
 		DOUBLE max_height = 0;
 
-		std::vector<std::array<BYTE, 4>> colors = { { BYTE( 0xFF ), BYTE( 0xFF ), BYTE( 0xFF ), BYTE( 0xFF ) } };
+		std::vector<std::array<FLOAT32, 4>> colors = { { 1.0F, 1.0F, 1.0F, 1.0F } };
 	};
 }

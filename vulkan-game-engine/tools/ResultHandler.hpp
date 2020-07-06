@@ -1,4 +1,5 @@
 #pragma once
+
 #include <vector>
 #include <algorithm>
 #include <vulkan/vulkan.hpp>
@@ -9,34 +10,61 @@ namespace noxcain
 	class ResultHandler
 	{
 	private:
+		enum class ResultTypes
+		{
+			INFO,
+			WARNING,
+			CRITICAL
+		} worst_type = ResultTypes::INFO;
 		ResultHandler( const ResultHandler& ) = delete;
 		ResultHandler& operator= ( const ResultHandler& ) = delete;
 
-		const ResultType successValue;
-		std::vector<ResultType> ignoreValues;
-		std::vector<ResultType> warningValues;
+		const ResultType success_value;
+		std::vector<ResultType> ignore_values;
+		std::vector<ResultType> warning_values;
 
-		ResultType last_value;
-		bool nothing_wrong = true;
+		struct ReceivedErrors
+		{
+			ResultTypes type = ResultTypes::CRITCIAL;
+			ResultType result;
+		};
+		std::vector<ReceivedErrors> received_errors;
 
 		std::string last_description;
 
 		void check_result( const ResultType& result )
 		{
-			last_value = result;
-			if( last_value != successValue )
+			auto check_values = [result]( const ResultType& value )
 			{
-				if( !std::any_of( ignoreValues.begin(), ignoreValues.end(), [this]( const ResultType& i ) { return i == last_value; } ) )
+				return value == result;
+			};
+
+			if( result != success_value )
+			{
+				if( !std::any_of( ignore_values.begin(), ignore_values.end(), check_values ) )
 				{
+					ResultTypes result_value_type;
+					if( std::any_of( warning_values.begin(), warning_values.end(), check_values ) )
+					{
+						result_value_type = ResultTypes::WARNING;
+						if( worst_type == ResultTypes::INFO )
+						{
+							worst_type = ResultTypes::WARNING;
+						}
+					}
+					else
+					{	
+						result_value_type = ResultTypes::CRITICAL;
+						worst_type = ResultTypes::CRITICAL;
+					}
+					received_errors.push_back( { result_value_type, result } );
 					//TODO add message in log
-					nothing_wrong = false;
-					//DebugBreak();
 				}
 			}
 		}
 
 	public:
-		ResultHandler( const ResultType& defaultSuccessValue ) : successValue( defaultSuccessValue ), last_value( defaultSuccessValue )
+		ResultHandler( const ResultType& default_success_value ) : success_value( default_success_value )
 		{
 		}
 
@@ -68,17 +96,37 @@ namespace noxcain
 
 		inline bool all_okay()
 		{
-			return nothing_wrong;
+			return worst_type == ResultTypes::INFO;
 		}
 
-		inline bool error()
+		inline bool is_critical()
 		{
-			return !nothing_wrong;
+			return worst_type == ResultTypes::CRITICAL;
 		}
 
 		inline ResultHandler& operator()( const std::string& new_description )
 		{
 			last_description = new_description;
+		}
+
+		void add_warnings( std::initializer_list<ResultType> values )
+		{
+			warning_values.assign( values );
+		}
+
+		void reset()
+		{
+			worst_type = ResultTypes::INFO;
+			received_errors.clear();
+		}
+
+		inline ResultType get_last_error()
+		{
+			if( received_errors.empty() )
+			{
+				return success_value;
+			}
+			return received_errors.back().result;
 		}
 	};
 }

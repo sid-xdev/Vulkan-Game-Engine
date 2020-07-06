@@ -11,6 +11,8 @@ namespace noxcain
 	{
 	private:
 
+		std::shared_ptr<PresentationSurface> surface_base = nullptr;
+
 		vk::Extent2D surfaceExtent;
 		vk::Format surfaceFormat = vk::Format::eUndefined;
 		
@@ -38,9 +40,9 @@ namespace noxcain
 
 		std::vector<vk::ImageView> swapChainImageViews;
 
-		void pickPhysicalDevice();
-		void createDevice();
-		void createSwapChain( const vk::SwapchainKHR& oldSwapChain = vk::SwapchainKHR() );
+		bool pickPhysicalDevice();
+		bool createDevice();
+		bool createSwapchain( const vk::SwapchainKHR& oldSwapChain = vk::SwapchainKHR() );
 
 	public:
 
@@ -49,7 +51,7 @@ namespace noxcain
 		GraphicCore& operator=( GraphicCore&& ) = delete;
 
 		GraphicCore();
-		bool initialize( const PresentationSurface& os_surface );
+		bool initialize( std::shared_ptr<PresentationSurface> os_surface );
 		~GraphicCore();
 
 		bool switchToNextPhysicalDevice();
@@ -66,6 +68,7 @@ namespace noxcain
 		vk::SwapchainKHR getSwapChain() const;
 		vk::ImageView getImageView( UINT32 index ) const;
 
-		void recreateSwapChain();
+		void close_surface_base() const;
+		bool recreate_swapchain( bool recreate_surface );
 	};
 }

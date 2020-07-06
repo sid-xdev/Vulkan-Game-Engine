@@ -8,7 +8,7 @@
 
 #include <array>
 
-void noxcain::GraphicCore::pickPhysicalDevice()
+bool noxcain::GraphicCore::pickPhysicalDevice()
 {
 	ResultHandler resultHandler( vk::Result::eSuccess );
 	std::vector<vk::PhysicalDevice> devices = resultHandler << instance.enumeratePhysicalDevices();
@@ -57,12 +57,10 @@ void noxcain::GraphicCore::pickPhysicalDevice()
 		}
 	}
 
-	/*
 	if( candidates.empty() )
 	{
-		throw std::exception( "No fitting physical graphic device available." );
+		return false;
 	}
-	*/
 
 	std::sort( candidates.begin(), candidates.end(), []( const PhysicalDeviceCandidate& firstCandidate, const PhysicalDeviceCandidate& secondeCandidate )
 	{
@@ -78,11 +76,12 @@ void noxcain::GraphicCore::pickPhysicalDevice()
 
 		return firstCandidate.properties.limits.maxStorageBufferRange > secondeCandidate.properties.limits.maxStorageBufferRange;
 	} );
+	return true;
 }
 
-void noxcain::GraphicCore::createDevice()
+bool noxcain::GraphicCore::createDevice()
 {
-	ResultHandler resultHandler( vk::Result::eSuccess );
+	ResultHandler r_handler( vk::Result::eSuccess );
 	
 
 	
@@ -93,92 +92,113 @@ void noxcain::GraphicCore::createDevice()
 
 	std::array<vk::DeviceQueueCreateInfo, 1> queueCreateInfos =
 	{
-		vk::DeviceQueueCreateInfo( vk::DeviceQueueCreateFlags(), candidates[deviceIndex].queueFamilyIndex, priorities.size(), priorities.data() )
+		vk::DeviceQueueCreateInfo( vk::DeviceQueueCreateFlags(), candidates[deviceIndex].queueFamilyIndex, UINT32( priorities.size() ), priorities.data() )
 	};
 
-	vk::DeviceCreateInfo deviceCreateInfo( vk::DeviceCreateFlags(), queueCreateInfos.size(), queueCreateInfos.data(), 0, nullptr, necessaryDeviceExtensions.size(), necessaryDeviceExtensions.data() );
+	vk::DeviceCreateInfo deviceCreateInfo( vk::DeviceCreateFlags(), UINT32( queueCreateInfos.size() ), queueCreateInfos.data(), 0, nullptr, UINT32( necessaryDeviceExtensions.size() ), necessaryDeviceExtensions.data() );
 
-	logical_device = resultHandler << getPhysicalDevice().createDevice( deviceCreateInfo );
+	logical_device = r_handler << getPhysicalDevice().createDevice( deviceCreateInfo );
+	return r_handler.all_okay();
 }
 
-void noxcain::GraphicCore::createSwapChain( const vk::SwapchainKHR& oldSwapChain )
+bool noxcain::GraphicCore::createSwapchain( const vk::SwapchainKHR& oldSwapChain )
 {
-	ResultHandler resultHandler( vk::Result::eSuccess );
+	ResultHandler r_handler( vk::Result::eSuccess );
 	const vk::PhysicalDevice& physicalDevice = candidates[deviceIndex].device;
 	
-	const std::vector<vk::PresentModeKHR>& possiblePresentModes = resultHandler << physicalDevice.getSurfacePresentModesKHR( surface );
-	presentationMode = vk::PresentModeKHR::eImmediate;
-	std::vector<vk::PresentModeKHR> wantedPresentModes =
+	if( surface_base->window_changed() || !surface )
 	{
-		//vk::PresentModeKHR::eFifoRelaxed,
-		//vk::PresentModeKHR::eFifo,
-		vk::PresentModeKHR::eMailbox,
-	};
+		instance.destroySurfaceKHR( surface );
+		surface = surface_base->create_surface( instance );
+	}
 
-	while( presentationMode == vk::PresentModeKHR::eImmediate && wantedPresentModes.size() > 0 )
+	if( surface )
 	{
-		for( const vk::PresentModeKHR& possiblePresentMode : possiblePresentModes )
+
+		const std::vector<vk::PresentModeKHR>& possiblePresentModes = r_handler << physicalDevice.getSurfacePresentModesKHR( surface );
+		presentationMode = vk::PresentModeKHR::eImmediate;
+		std::vector<vk::PresentModeKHR> wantedPresentModes =
 		{
-			if( possiblePresentMode == wantedPresentModes.back() )
+			vk::PresentModeKHR::eFifoRelaxed,
+			vk::PresentModeKHR::eFifo,
+			//vk::PresentModeKHR::eMailbox,
+		};
+
+		while( presentationMode == vk::PresentModeKHR::eImmediate && wantedPresentModes.size() > 0 )
+		{
+			for( const vk::PresentModeKHR& possiblePresentMode : possiblePresentModes )
 			{
-				presentationMode = wantedPresentModes.back();
-				break;
+				if( possiblePresentMode == wantedPresentModes.back() )
+				{
+					presentationMode = wantedPresentModes.back();
+					break;
+				}
 			}
+			wantedPresentModes.pop_back();
 		}
-		wantedPresentModes.pop_back();
+
+		const vk::SurfaceCapabilitiesKHR& surfaceCapabilities = r_handler << physicalDevice.getSurfaceCapabilitiesKHR( surface );
+		if( presentationMode != vk::PresentModeKHR::eMailbox ) presentationImageCount = 2;
+		if( presentationImageCount < surfaceCapabilities.minImageCount ) presentationImageCount = surfaceCapabilities.minImageCount;
+		if( surfaceCapabilities.maxImageCount && presentationImageCount > surfaceCapabilities.maxImageCount ) presentationImageCount = surfaceCapabilities.maxImageCount;
+
+		const std::vector<vk::SurfaceFormatKHR>& surfaceFormates = r_handler << physicalDevice.getSurfaceFormatsKHR( surface );
+
+		surfaceExtent = surfaceCapabilities.currentExtent;
+		surfaceFormat = surfaceFormates[0].format;
+
+		swapChain = r_handler << logical_device.createSwapchainKHR( vk::SwapchainCreateInfoKHR(
+			vk::SwapchainCreateFlagsKHR(),
+			surface,
+			presentationImageCount,
+			surfaceFormat,
+			surfaceFormates[0].colorSpace,
+			surfaceExtent,
+			1,
+			vk::ImageUsageFlagBits::eColorAttachment,
+			vk::SharingMode::eExclusive,
+			0, nullptr,
+			surfaceCapabilities.currentTransform,
+			vk::CompositeAlphaFlagBitsKHR::eOpaque,
+			presentationMode,
+			VK_FALSE,
+			oldSwapChain ) );
+
+		if( r_handler.all_okay() )
+		{
+			std::vector<vk::Image> swapChainImages = r_handler << logical_device.getSwapchainImagesKHR( swapChain );
+			swapChainImageViews.resize( swapChainImages.size() );
+			for( UINT32 swapChainImageIndex = 0; swapChainImageIndex < swapChainImages.size(); ++swapChainImageIndex )
+			{
+				swapChainImageViews[swapChainImageIndex] = r_handler << logical_device.createImageView( vk::ImageViewCreateInfo(
+					vk::ImageViewCreateFlags(), swapChainImages[swapChainImageIndex], vk::ImageViewType::e2D, surfaceFormates[0].format,
+					vk::ComponentMapping( vk::ComponentSwizzle::eR, vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB, vk::ComponentSwizzle::eA ),
+					vk::ImageSubresourceRange( vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 ) ) );
+			}
+			return r_handler.all_okay();
+		}
 	}
-
-	const vk::SurfaceCapabilitiesKHR& surfaceCapabilities = resultHandler << physicalDevice.getSurfaceCapabilitiesKHR( surface );
-	if( presentationMode != vk::PresentModeKHR::eMailbox ) presentationImageCount = 2;
-	if( presentationImageCount < surfaceCapabilities.minImageCount ) presentationImageCount = surfaceCapabilities.minImageCount;
-	if( surfaceCapabilities.maxImageCount && presentationImageCount > surfaceCapabilities.maxImageCount ) presentationImageCount = surfaceCapabilities.maxImageCount;
-
-	const std::vector<vk::SurfaceFormatKHR>& surfaceFormates = resultHandler << physicalDevice.getSurfaceFormatsKHR( surface );
-
-	surfaceExtent = surfaceCapabilities.currentExtent;
-	surfaceFormat = surfaceFormates[0].format;
-
-	swapChain = resultHandler << logical_device.createSwapchainKHR( vk::SwapchainCreateInfoKHR(
-		vk::SwapchainCreateFlagsKHR(),
-		surface,
-		presentationImageCount,
-		surfaceFormat,
-		surfaceFormates[0].colorSpace,
-		surfaceExtent,
-		1,
-		vk::ImageUsageFlagBits::eColorAttachment,
-		vk::SharingMode::eExclusive,
-		0, nullptr,
-		surfaceCapabilities.currentTransform,
-		vk::CompositeAlphaFlagBitsKHR::eOpaque,
-		presentationMode, //vk::PresentModeKHR::eFifo ,
-		VK_FALSE,
-		oldSwapChain ) );
-
-	std::vector<vk::Image> swapChainImages = resultHandler << logical_device.getSwapchainImagesKHR( swapChain );
-	swapChainImageViews.resize( swapChainImages.size() );
-	for( UINT32 swapChainImageIndex = 0; swapChainImageIndex < swapChainImages.size(); ++swapChainImageIndex )
-	{
-		swapChainImageViews[swapChainImageIndex] = resultHandler << logical_device.createImageView( vk::ImageViewCreateInfo(
-			vk::ImageViewCreateFlags(), swapChainImages[swapChainImageIndex], vk::ImageViewType::e2D, surfaceFormates[0].format,
-			vk::ComponentMapping( vk::ComponentSwizzle::eR, vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB, vk::ComponentSwizzle::eA ),
-			vk::ImageSubresourceRange( vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 ) ) );
-	}
+	return false;
 }
 
 noxcain::GraphicCore::GraphicCore()
 {
 }
 
-bool noxcain::GraphicCore::initialize( const PresentationSurface& os_surface )
+bool noxcain::GraphicCore::initialize( std::shared_ptr<PresentationSurface> os_surface )
 {
+	if( os_surface )
+	{
+		surface_base = os_surface;
+	}
+
 	ResultHandler result_handler( vk::Result::eSuccess );
 	std::vector<vk::ExtensionProperties> available_extensions;
 
 	available_extensions = result_handler << vk::enumerateInstanceExtensionProperties();
 	if( result_handler.all_okay() )
 	{
-		os_surface.add_surface_extension( necessary_instance_extensions );
+		os_surface->add_surface_extension( necessary_instance_extensions );
 
 		for( const char* necessary_extension : necessary_instance_extensions )
 		{
@@ -202,23 +222,31 @@ bool noxcain::GraphicCore::initialize( const PresentationSurface& os_surface )
 
 		std::vector<const char*> validation_layers;
 #ifndef NDEBUG
+#ifdef WIN32
 		validation_layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 		validation_layers.push_back( "VK_LAYER_LUNARG_monitor" );
+#endif // WIN32
 #endif // NDEBUG
 
 
 		instance = result_handler << vk::createInstance( vk::InstanceCreateInfo( vk::InstanceCreateFlags(), &application_info,
-																				validation_layers.size(), validation_layers.data(),
-																				necessary_instance_extensions.size(), necessary_instance_extensions.data() ) );
+																				UINT32( validation_layers.size() ), validation_layers.data(),
+																				UINT32( necessary_instance_extensions.size() ), necessary_instance_extensions.data() ) );
 		if( result_handler.all_okay() )
 		{
-			surface = os_surface.createSurface( instance );
-			pickPhysicalDevice();
-			createDevice();
-			createSwapChain( swapChain );
+			surface = os_surface->create_surface( instance );
+			if( surface )
+			{
+				if( pickPhysicalDevice() && 
+					createDevice() && 
+					createSwapchain( swapChain ) )
+				{
+					return true;
+				}
+			}
 		}
 	}
-	return result_handler.all_okay();
+	return false;
 }
 
 noxcain::GraphicCore::~GraphicCore()
@@ -273,7 +301,7 @@ noxcain::UINT32 noxcain::GraphicCore::get_graphic_queue_family_index() const
 
 noxcain::UINT32 noxcain::GraphicCore::get_swapchain_image_count() const
 {
-	return swapChainImageViews.size();
+	return UINT32( swapChainImageViews.size() );
 }
 
 vk::Extent2D noxcain::GraphicCore::get_window_extent() const
@@ -311,7 +339,15 @@ vk::ImageView noxcain::GraphicCore::getImageView( UINT32 index ) const
 	return swapChainImageViews[index];
 }
 
-void noxcain::GraphicCore::recreateSwapChain()
+void noxcain::GraphicCore::close_surface_base() const
+{
+	if( surface_base && *surface_base )
+	{
+		surface_base->close();
+	}
+}
+
+bool noxcain::GraphicCore::recreate_swapchain( bool recreate_surface )
 {
 	for( const vk::ImageView& imageView : swapChainImageViews )
 	{
@@ -319,9 +355,16 @@ void noxcain::GraphicCore::recreateSwapChain()
 	}
 	swapChainImageViews.clear();
 
+	if( recreate_surface )
+	{
+		instance.destroy( surface );
+		surface = vk::SurfaceKHR();
+	}
+
 	vk::SwapchainKHR oldSwapChain = swapChain;
 
-	createSwapChain( oldSwapChain );
+	bool result = createSwapchain( recreate_surface ? vk::SwapchainKHR() : oldSwapChain );
 
 	logical_device.destroySwapchainKHR( oldSwapChain );
+	return result;
 }

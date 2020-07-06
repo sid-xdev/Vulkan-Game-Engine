@@ -1,5 +1,6 @@
 #pragma once
 
+#include <logic/RegionEventReceiver.hpp>
 #include <logic/Level.hpp>
 #include <logic/Quad2D.hpp>
 #include <logic/VectorText2D.hpp>
@@ -11,6 +12,7 @@ namespace noxcain
 {
 	class BaseButton;
 	class HorizontalScrollBar;
+	class VectorTextLabel2D;
 	
 	class DebugLevel : public GameLevel
 	{
@@ -19,7 +21,7 @@ namespace noxcain
 		Renderable<RenderableQuad2D>::List label_list;
 		Renderable<VectorText2D>::List text_list;
 
-		class TimeFrameLabel
+		class TimeFrameLabel : public RegionalEventRecieverNode
 		{
 		public:
 			TimeFrameLabel( DebugLevel& level );
@@ -33,14 +35,21 @@ namespace noxcain
 									  const Region& scissor );
 			void hide();
 
-			operator Region&( );
-			operator const Region&() const;
-			
+			operator Region& ( );
+			operator const Region& ( ) const;
+
 			Region& get_region();
 			void set_color( DOUBLE red, DOUBLE green, DOUBLE blue );
 
+
+
 		private:
-			
+			bool try_hit( const RegionalKeyEvent& key_event ) const override;
+			bool hit( const RegionalKeyEvent& key_event ) override;
+			bool miss( const RegionalKeyEvent& key_event ) override;
+
+			std::string time_description;
+			VectorTextLabel2D& tooltip;
 			RenderableQuad2D frame;
 			RenderableQuad2D background;
 			VectorText2D text;
@@ -64,6 +73,7 @@ namespace noxcain
 		std::unique_ptr<PassivColorLabel> background;
 		std::unique_ptr<HorizontalScrollBar> scroll_bar;
 		std::unique_ptr<BaseButton> exit_button;
+		std::unique_ptr<VectorTextLabel2D> tooltip;
 
 		constexpr static std::chrono::nanoseconds PERFORMANCE_TIME_FRAME = std::chrono::milliseconds( 10 );
 		std::chrono::steady_clock::time_point performance_time_stamp;

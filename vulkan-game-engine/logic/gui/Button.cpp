@@ -3,13 +3,17 @@
 void noxcain::BaseButton::activate()
 {
 	background.set_color( normal_color );
-	text_content.get_text().set_color( active_text_color );
+	if( !active )
+	{
+		text_content.get_text().set_color( active_text_color );
+	}
 	RegionalEventRecieverNode::activate();
 }
 
 void noxcain::BaseButton::deactivate()
 {
 	background.set_color( inactive_color );
+	active_text_color = text_content.get_text().get_color();
 	text_content.get_text().set_color( inactive_text_color );
 	RegionalEventRecieverNode::deactivate();
 }

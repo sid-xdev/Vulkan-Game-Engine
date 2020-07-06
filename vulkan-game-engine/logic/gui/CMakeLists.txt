@@ -1,15 +1,17 @@
-cmake_minimum_required(  VERSION 3.13.0 )
+if(NOT POLICY CMP0076)
+	set( SUBFOLDER "gui/" )
+endif()
 
 target_sources( logiclib 
 	PRIVATE
-		Label.cpp
-		Button.cpp
-		ScrollBar.cpp
+		${SUBFOLDER}Label.cpp
+		${SUBFOLDER}Button.cpp
+		${SUBFOLDER}ScrollBar.cpp
 )
 
 target_sources( logiclib 
 	PRIVATE
-		Label.hpp
-		Button.hpp
-		ScrollBar.hpp
+		${SUBFOLDER}Label.hpp
+		${SUBFOLDER}Button.hpp
+		${SUBFOLDER}ScrollBar.hpp
 )	

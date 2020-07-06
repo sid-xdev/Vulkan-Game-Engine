@@ -12,23 +12,21 @@ int CALLBACK WinMain(
 	_In_ int       nCmdShow
 )
 {
-	constexpr INT32 SCREEN_WIDTH = 1920U;
-	constexpr INT32 SCREEN_HEIGHT = 1080U;
-
-	noxcain::WindowClass wndClass( hInstance );
-	noxcain::Window window( hInstance, wndClass, -SCREEN_WIDTH, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
-
-	return int( noxcain::GraphicEngine::run( window ) );
+	std::shared_ptr window_class = std::make_shared<noxcain::WindowClass>( hInstance );
+	if( *window_class )
+	{
+		std::make_shared<noxcain::Window>( window_class )->draw();
+	}
+	return 0;
 }
+
 #elif __ANDROID__
 
-#include "AndroidOS/AndroidSurface.h"
-#include <android/native_window.h>
+#include <android/AndroidSurface.hpp>
 
-void android_main( struct android_app* state )
+void android_main( struct android_app* app_state )
 {
-	noxcain::AndroidSurface surface;
-
-	noxcain::GraphicEngine::run( surface );
+	auto surface = std::make_shared<noxcain::AndroidSurface>( app_state );
+	surface->draw();
 }
 #endif

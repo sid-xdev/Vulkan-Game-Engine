@@ -42,15 +42,12 @@ void noxcain::VectorText::calculate_offsets()
 
 void noxcain::VectorText::set_base_color( const std::array<FLOAT32, 4>& color )
 {
-	for( std::size_t index = 0; index < 4; ++index )
-	{
-		colors[0][index] = BYTE( 255 * fmax( 0.0, fmin( color[index], 1.0 ) ) );
-	}
+	colors[0] = color;
 }
 
 noxcain::VectorText::VectorText()
 {
-	set_font_id( 0 );
+	set_font_id( 1 );
 }
 
 void noxcain::VectorText::set_utf8( const std::string& utf8String )

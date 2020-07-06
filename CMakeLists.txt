@@ -10,15 +10,23 @@ endif()
 
 project( vulkan-game-engine
 	VERSION 1.0
-	LANGUAGES CXX )
+	LANGUAGES C CXX )
 
 find_package( Vulkan REQUIRED FATAL_ERROR)
 
-include_directories( vulkan-game-engine )
-include_directories( ${Vulkan_INCLUDE_DIR} )
-add_subdirectory( vulkan-game-engine )
+if( ${CMAKE_SYSTEM_NAME} STREQUAL "Windows" ) 
+	include_directories( ${Vulkan_INCLUDE_DIR} )
+endif()
 
-set( NX_GLSL_SHADER_DIR "${CMAKE_SOURCE_DIR}/build-data/shaders" CACHE PATH "GLSL shader files directory" )
-set( NX_GLSL_LANGUAGE_VALIDATOR $ENV{VULKAN_SDK}/bin/glslangValidator CACHE FILEPATH "glslangValidator file path" )
+if( ${CMAKE_SYSTEM_NAME} STREQUAL "Android" )
+	include_directories( 
+		${ANDROID_NDK}/sources/android/ndk_helper
+		${ANDROID_NDK}/sources/third_party/vulkan/src/include
+		${ANDROID_NDK}/sources/android/native_app_glue )
+endif()
+
+include_directories( vulkan-game-engine )
+add_subdirectory( vulkan-game-engine )
+add_subdirectory( font-engine )
 
 

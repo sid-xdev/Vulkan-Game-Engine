@@ -4,6 +4,7 @@
 #include <logic/Renderable.hpp>
 #include <logic/RegionEventReceiver.hpp>
 #include <logic/SceneGraph.hpp>
+#include <tools/TimeFrame.hpp>
 
 #include <memory>
 #include <chrono>
@@ -33,8 +34,12 @@ namespace noxcain
 			FINISHED
 		};
 
+		// updates the key events
+		// it is seperated from update logic to do it even when everything else is on pause
+		void update_key_events( const std::vector<KeyEvent>& key_events );
+
 		// updates the internal level logic
-		void update( const std::chrono::nanoseconds& deltaTime, const std::vector<KeyEvent>& key_events, const std::vector<RegionalKeyEvent>& region_key_events );
+		void update_logic( const std::chrono::nanoseconds& deltaTime, const std::vector<RegionalKeyEvent>& region_key_events );
 
 		GameLevel();
 		virtual ~GameLevel();
@@ -80,6 +85,7 @@ namespace noxcain
 		}
 
 	private:
+		TimeFrameCollector time_collector;
 		Status status = Status::STARTING;
 		
 		// level scene graph;

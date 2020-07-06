@@ -86,7 +86,6 @@ namespace noxcain
 			ImageBinding& destImageBinding;
 			ImageRequest( ImageBinding& destImageBinding, vk::MemoryPropertyFlags memoryProperties, vk::ImageCreateInfo createInfo ) :
 				ImageRequest::ImageCreateInfo( createInfo ), memoryProperties( memoryProperties ), destImageBinding( destImageBinding ){}
-			ImageRequest() = default;
 		};
 
 		struct BlockRequest : public vk::BufferCreateInfo
@@ -95,7 +94,6 @@ namespace noxcain
 			BlockBinding& destBlockBinding;
 			BlockRequest( BlockBinding& destBlockBinding, vk::MemoryPropertyFlags memoryProperties, vk::BufferCreateInfo createInfo ) :
 				BlockRequest::BufferCreateInfo( createInfo ), memoryProperties( memoryProperties ), destBlockBinding( destBlockBinding ) {}
-			BlockRequest() = default;
 		};
 		
 		struct MapRange

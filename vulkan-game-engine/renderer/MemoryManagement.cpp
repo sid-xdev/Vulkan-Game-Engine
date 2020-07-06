@@ -83,8 +83,8 @@ bool noxcain::MemoryManager::request_resource_memory()
 			}
 		}
 
-		font_update.updates.emplace_back( 0, 0, DescriptorSetManager::DescriptorUpdateInfoTypes::BUFFER_INFO, point_offset_buffers.size(), point_offset_buffers.data() );
-		font_update.updates.emplace_back( 1, 0, DescriptorSetManager::DescriptorUpdateInfoTypes::BUFFER_INFO, point_buffers.size(), point_buffers.data() );
+		font_update.updates.emplace_back( 0, 0, DescriptorSetManager::DescriptorUpdateInfoTypes::BUFFER_INFO, UINT32( point_offset_buffers.size() ), point_offset_buffers.data() );
+		font_update.updates.emplace_back( 1, 0, DescriptorSetManager::DescriptorUpdateInfoTypes::BUFFER_INFO, UINT32( point_buffers.size() ), point_buffers.data() );
 
 		return GraphicEngine::get_descriptor_set_manager().update_basic_sets( { font_update } );
 	}
@@ -189,7 +189,7 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 			vk::ImageSubresourceRange( binding.viewAspect, 0, 1, 0, 1 ) ) );
 	}
 
-	if( r_handler.error() )
+	if( r_handler.is_critical() )
 	{
 		return false;
 	}
@@ -348,7 +348,7 @@ bool noxcain::MemoryManager::create_managed_memory(
 
 	for( const BlockRequest& block : blockRequests )
 	{
-		UINT32 alignment =
+		vk::DeviceSize alignment =
 			block.usage & ( vk::BufferUsageFlagBits::eStorageTexelBuffer | block.usage & vk::BufferUsageFlagBits::eUniformTexelBuffer ) ? limits.minTexelBufferOffsetAlignment :
 			block.usage & vk::BufferUsageFlagBits::eStorageBuffer ? limits.minStorageBufferOffsetAlignment :
 			block.usage & vk::BufferUsageFlagBits::eUniformBuffer ? limits.minUniformBufferOffsetAlignment :
@@ -399,7 +399,7 @@ bool noxcain::MemoryManager::create_managed_memory(
 				bufferBin.memoryTypeBits = newMemoryTypeBits;
 				bufferBin.blocks.emplace_back( &block );
 
-				UINT32 padding = bufferBin.createInfos.size % alignment;
+				vk::DeviceSize padding = bufferBin.createInfos.size % alignment;
 				if( padding > 0 ) padding = alignment - padding;
 
 				block.destBlockBinding.offset = bufferBin.createInfos.size + padding;
@@ -534,10 +534,10 @@ bool noxcain::MemoryManager::create_managed_memory(
 
 	for( MemoryBin& memoryBin : memoryBins )
 	{
-		UINT64 memorySize = 0;
+		vk::DeviceSize memorySize = 0;
 		for( const auto& memReq : memoryBin.buffers )
 		{
-			UINT32 padding = memorySize % memReq.second;
+			vk::DeviceSize padding = memorySize % memReq.second;
 			if( padding > 0 ) padding = memReq.second - padding;
 
 			BufferBinding& currentBufferBinding = buffers[memReq.first];
@@ -547,7 +547,7 @@ bool noxcain::MemoryManager::create_managed_memory(
 
 		for( const auto& memReq : memoryBin.images )
 		{
-			UINT32 padding = memorySize % memReq.second;
+			vk::DeviceSize padding = memorySize % memReq.second;
 			if( padding > 0 ) padding = memReq.second - padding;
 
 			ImageBinding& currentImageBinding = *memReq.first;
@@ -567,7 +567,7 @@ bool noxcain::MemoryManager::create_managed_memory(
 
 		if( r_handler.all_okay() && newMemory )
 		{
-			UINT32 memoryIndex = memory.size();
+			UINT32 memoryIndex = UINT32( memory.size() );
 			memory.push_back( { newMemory, UINT32( memoryBin.buffers.size() + memoryBin.images.size() ) } );
 			mapRanges.push_back( {} );
 

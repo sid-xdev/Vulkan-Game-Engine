@@ -1,4 +1,3 @@
-cmake_minimum_required(  VERSION 3.13.0 )
 
 add_library( renderlib OBJECT "" )
 
@@ -41,5 +40,12 @@ target_sources( renderlib
 
 target_compile_features( renderlib PUBLIC cxx_std_17 )
 
-add_definitions( -DVK_USE_PLATFORM_WIN32_KHR )
-add_definitions( -DVULKAN_HPP_NO_EXCEPTIONS )
+if( ${CMAKE_SYSTEM_NAME} STREQUAL "Windows" )
+	add_definitions( -DVK_USE_PLATFORM_WIN32_KHR )
+endif()
+
+if( ${CMAKE_SYSTEM_NAME} STREQUAL "Android" )
+	add_definitions( -DVK_USE_PLATFORM_ANDROID_KHR )
+endif()
+
+add_definitions( "-DVULKAN_HPP_NO_EXCEPTIONS" "-DVULKAN_HPP_ASSERT=bool" )

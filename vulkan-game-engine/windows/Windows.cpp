@@ -1,14 +1,33 @@
 #include <windows/Windows.hpp>
 
+#include <vulkan/vulkan.hpp>
+#include <renderer/GameGraphicEngine.hpp>
 #include <logic/GameLogicEngine.hpp>
 #include <tools/ResultHandler.hpp>
 
-LRESULT CALLBACK noxcain::Window::processMessage( _In_ HWND hWnd, _In_ UINT uMsg, _In_ WPARAM wParam, _In_ LPARAM lParam )
+LRESULT CALLBACK noxcain::Window::process_message( _In_ HWND hWnd, _In_ UINT uMsg, _In_ WPARAM wParam, _In_ LPARAM lParam )
 {
 	switch( uMsg )
 	{
 		case WM_KEYDOWN:
 		{
+			if( wParam == 0x57 )
+			{
+				RECT rect;
+				GetWindowRect( window_handle, &rect );
+				SetWindowPos( window_handle, NULL, rect.left, 0, ( rect.right - rect.left )/2, ( rect.bottom - rect.top )/2, NULL );
+			}
+
+			if( wParam == 0x51 )
+			{
+				LogicEngine::pause();
+			}
+
+			if( wParam == 0x45 )
+			{
+				LogicEngine::resume();
+			}
+			
 			LogicEngine::set_event( InputEventTypes::KEY_DOWN, 0, 0, UINT32( wParam ) );
 			break;
 		}
@@ -44,24 +63,24 @@ LRESULT CALLBACK noxcain::Window::processMessage( _In_ HWND hWnd, _In_ UINT uMsg
 			break;
 		}
 	}
-	if( uMsg == WM_KEYDOWN || uMsg == WM_KEYUP )
-	{
-		
-	}
 	return NULL;
 }
 
 
-vk::SurfaceKHR noxcain::Window::createSurface( const vk::Instance& instance ) const
+vk::SurfaceKHR noxcain::Window::create_surface( const vk::Instance& instance )
 {
 	vk::SurfaceKHR surface;
-	while( windowStatus == WindowStatus::eNone );
-
-	if( windowStatus == WindowStatus::eWorking )
+	ResultHandler r_handler( vk::Result::eSuccess );
+	if( operator bool() )
 	{
-		surface = ResultHandler(vk::Result::eSuccess) << instance.createWin32SurfaceKHR( vk::Win32SurfaceCreateInfoKHR( vk::Win32SurfaceCreateFlagsKHR(), getWindowModul( msWindow ), msWindow ) );
+		surface = r_handler << instance.createWin32SurfaceKHR( vk::Win32SurfaceCreateInfoKHR( vk::Win32SurfaceCreateFlagsKHR(), get_window_modul( window_handle ), window_handle ) );
 	}
-	return surface;	
+
+	if( surface && r_handler.all_okay() )
+	{
+		return surface;
+	}
+	return vk::SurfaceKHR();
 }
 
 
@@ -70,54 +89,83 @@ void noxcain::Window::add_surface_extension( std::vector<const char*>& extension
 	extensions.push_back( VK_KHR_WIN32_SURFACE_EXTENSION_NAME );
 }
 
-
-noxcain::Window::Window( HINSTANCE hInstance, const  WindowClass& windowClass, INT32 x, INT32 y, UINT32 width, UINT32 height )
+void noxcain::Window::close() const
 {
-	windowThread = std::thread( &windowThreadFunction, this, hInstance, windowClass.GetClassId(), x, y, width, height );
+	if( operator bool() )
+	{
+		PostMessage( window_handle, WM_DESTROY, NULL, NULL );
+	}
 }
 
-void noxcain::Window::windowThreadFunction( noxcain::Window* wrapper, HINSTANCE hInstance, LPCSTR classId, INT32 x, INT32 y, UINT32 width, UINT32 height )
+noxcain::Window::operator bool() const
 {
-	HWND wndHandle = CreateWindowEx( NULL, classId, NULL, WS_POPUP | WS_VISIBLE, x, y, width, height, NULL, NULL, hInstance, reinterpret_cast<void*>( wrapper ) );
+	return IsWindow( window_handle );
+}
 
-	if( wndHandle )
-	{	
-		RAWINPUTDEVICE device = 
-		{
-			1, //usUsagePage
-			2, //usUsage
-			0, //flags
-			wndHandle //hwndTarget = 
-		};
-		
-		bool sc = RegisterRawInputDevices( &device, 1, sizeof( RAWINPUTDEVICE ) );
+bool noxcain::Window::window_changed() const
+{
+	//TODO should never happen under windows?
+	//important for android and co.
+	return GetActiveWindow() != window_handle;
+}
 
-		wrapper->msWindow = wndHandle;
-		wrapper->windowStatus = WindowStatus::eWorking;
-		MSG msg = {};
-		BOOL result;
-		while( result = GetMessage( &msg, NULL, 0, 0 ) )
+noxcain::Window::Window( std::shared_ptr<WindowClass> window_class ) : window_class( window_class )
+{
+}
+
+void noxcain::Window::draw()
+{
+	constexpr INT32 SCREEN_WIDTH = 1920U;
+	constexpr INT32 SCREEN_HEIGHT = 1080U;
+
+	if( window_class )
+	{
+		//TODO get config start parameters
+
+		HWND w_handle = CreateWindowEx( NULL, window_class->get_class_id(), NULL, WS_POPUP | WS_VISIBLE, -SCREEN_WIDTH, 0, SCREEN_WIDTH, SCREEN_HEIGHT, NULL, NULL, window_class->get_modul(), reinterpret_cast<void*>( this ) );
+
+		if( w_handle )
 		{
-			if( result == -1 )
+			RAWINPUTDEVICE device =
 			{
-				DebugBreak();
+				1, //usUsagePage
+				2, //usUsage
+				0, //flags
+				w_handle //hwndTarget = 
+			};
+
+			bool sc = RegisterRawInputDevices( &device, 1, sizeof( RAWINPUTDEVICE ) );
+
+			window_handle = w_handle;
+
+			if( !noxcain::GraphicEngine::run( shared_from_this() ) )
+			{
+				close();
 			}
-			else
+
+			MSG msg = {};
+			BOOL result;
+			while( result = GetMessage( &msg, NULL, 0, 0 ) )
 			{
-				DispatchMessage( &msg );
+				if( result == -1 )
+				{
+					DebugBreak();
+				}
+				else
+				{
+					DispatchMessage( &msg );
+				}
 			}
 		}
+		window_handle = NULL;
 	}
-	wrapper->msWindow = NULL;
-	wrapper->windowStatus = WindowStatus::eDestroyed;
 }
 
 noxcain::Window::~Window()
 {
-	if( windowThread.joinable() )
+	if( operator bool() )
 	{
-		PostMessage( msWindow, WM_DESTROY, 0, 0 );
-		windowThread.join();
+		PostMessage( window_handle, WM_DESTROY, 0, 0 );
 	}
 }
 
@@ -136,7 +184,7 @@ LRESULT CALLBACK noxcain::WindowClass::windowProc_( _In_ HWND hWnd, _In_ UINT uM
 		{
 			if( uMsg == WM_INPUT || uMsg >= WM_KEYFIRST && uMsg <= WM_KEYLAST || uMsg >= WM_MOUSEFIRST && uMsg <= WM_MOUSELAST )
 			{
-				return window->processMessage( hWnd, uMsg, wParam, lParam );
+				return window->process_message( hWnd, uMsg, wParam, lParam );
 			}
 			else if( uMsg == WM_DESTROY )
 			{
@@ -148,7 +196,7 @@ LRESULT CALLBACK noxcain::WindowClass::windowProc_( _In_ HWND hWnd, _In_ UINT uM
 	return DefWindowProc( hWnd, uMsg, wParam, lParam );
 }
 
-noxcain::WindowClass::WindowClass( HINSTANCE hInstance ) : windowClassProperties_(
+noxcain::WindowClass::WindowClass( HINSTANCE hInstance ) : window_class_properties(
 	{
 		sizeof( WNDCLASSEX ),  //UINT      cbSize;
 		CS_OWNDC,			   //UINT      style;
@@ -164,21 +212,21 @@ noxcain::WindowClass::WindowClass( HINSTANCE hInstance ) : windowClassProperties
 		NULL,                  //HICON     hIconSm;
 	} )
 {
-	windowClassId_ = RegisterClassEx( &windowClassProperties_ );
+	window_class_id = RegisterClassEx( &window_class_properties );
 }
 
 noxcain::WindowClass::~WindowClass()
 {	
-	if( windowClassId_ )
+	if( window_class_id )
 	{
-		UnregisterClass( GetClassId(), NULL );
+		UnregisterClass( get_class_id(), NULL );
 	}
 }
 
-LPCSTR noxcain::WindowClass::GetClassId() const
+LPCSTR noxcain::WindowClass::get_class_id() const
 {
 	LPCSTR longPointer = 0x0;
-	reinterpret_cast<ATOM*>( &longPointer )[0] = windowClassId_;
+	reinterpret_cast<ATOM*>( &longPointer )[0] = window_class_id;
 	return longPointer;
 }
 

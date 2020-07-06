@@ -17,7 +17,7 @@ namespace noxcain
 	public:
 		struct SubmitCommandBufferData
 		{
-			UINT32 id;
+			UINT32 id = 0;
 			vk::CommandBuffer main_buffer;
 			std::vector<vk::CommandBuffer> finalize_command_buffers;
 		};
@@ -27,13 +27,21 @@ namespace noxcain
 
 		INT32 get_free_buffer_id();
 		bool set_newest_command_buffer( SubmitCommandBufferData buffer_data );
+		bool check_swapchain();
 
 	private:
 		TimeFrameCollector time_collection_all = TimeFrameCollector( "GPU Overall" );
 		TimeFrameCollector time_collection_gpu = TimeFrameCollector( "GPU Sub Tasks" );
 
-		bool shutdown = false;
-		bool swapchain_is_new = false;
+		enum class Status
+		{
+			SUBMIT,
+			RECREAT_SWAPCHAIN,
+			EXIT
+		} status = Status::SUBMIT;
+
+		bool lost_surface = false;
+		void recreate_swapchain( bool recreate_surface );
 
 		UINT32 submit_loop();
 		std::mutex submit_mutex;
@@ -52,7 +60,8 @@ namespace noxcain
 		};
 		constexpr static std::size_t SEMOPHORE_COUNT = 3;
 
-		std::array<vk::Semaphore, SEMOPHORE_COUNT> semaphores;
+		void create_semaphores();
+		std::array<vk::Semaphore, SEMOPHORE_COUNT> semaphores = {};
 		vk::Fence frame_end_fence;
 
 		const vk::Semaphore& get_semaphore( SemaphoreIds id )

@@ -1,9 +1,11 @@
 #pragma once
 #include <Defines.hpp>
-#include <shader/shader.hpp>
 
 #include <memory>
+#include <chrono>
+
 #include <vulkan/vulkan.hpp>
+#include <shader/shader.hpp>
 
 namespace noxcain
 {
@@ -19,11 +21,11 @@ namespace noxcain
 	{
 	private:
 		std::unique_ptr<GraphicCore> core;
+		std::unique_ptr<RenderQuery> render_query;
 		std::unique_ptr<DescriptorSetManager> descriptor_sets;
 		std::unique_ptr<MemoryManager> memory;
 		std::unique_ptr<ShaderManager> shader;
 		std::unique_ptr<CommandManager> commands;
-		std::unique_ptr<RenderQuery> render_query;
 		
 		bool clear();
 		void initialize();
@@ -39,8 +41,7 @@ namespace noxcain
 		static std::unique_ptr<GraphicEngine> engine;
 		GraphicEngine();
 	public:
-
-		static bool run( const PresentationSurface& os_surface );
+		static bool run( std::shared_ptr<PresentationSurface> os_surface );
 
 		static vk::Device get_device();
 		static vk::PhysicalDevice get_physical_device();
@@ -48,6 +49,7 @@ namespace noxcain
 		static UINT32 get_swapchain_image_count();
 		static vk::Format get_swapchain_image_format();
 		static vk::ImageView get_swapchain_image_view( std::size_t image_index );
+		static bool recreate_swapchain( bool recreate_surface );
 		
 		static MemoryManager& get_memory_manager();
 
@@ -62,6 +64,8 @@ namespace noxcain
 		static vk::ShaderModule get_shader( FragmentShaderIds shader_id );
 		static vk::ShaderModule get_shader( ComputeShaderIds shader_id );
 		static vk::ShaderModule get_shader( VertexShaderIds shader_id );
+
+		static void finish();
 
 		~GraphicEngine();
 	};

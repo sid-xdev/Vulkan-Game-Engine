@@ -28,10 +28,10 @@ void noxcain::VectorText3D::record( vk::CommandBuffer command_buffer, vk::Pipeli
 		UINT32 current_glyph_id = glyph.glyph_id + text.get_font().get_font_offset();
 
 		FLOAT32* targetColorBuffer = reinterpret_cast<FLOAT32*>( fragmentPushConstants.data() );
-		targetColorBuffer[1] = FLOAT32( text.colors[glyph.color_index][0] ) / 0xFF;
-		targetColorBuffer[2] = FLOAT32( text.colors[glyph.color_index][1] ) / 0xFF;
-		targetColorBuffer[3] = FLOAT32( text.colors[glyph.color_index][2] ) / 0xFF;
-		targetColorBuffer[4] = FLOAT32( text.colors[glyph.color_index][3] ) / 0xFF;
+		targetColorBuffer[1] = text.colors[glyph.color_index][0];
+		targetColorBuffer[2] = text.colors[glyph.color_index][1];
+		targetColorBuffer[3] = text.colors[glyph.color_index][2];
+		targetColorBuffer[4] = text.colors[glyph.color_index][3];
 
 		reinterpret_cast<UINT32*>( targetColorBuffer )[0] = current_glyph_id;
 

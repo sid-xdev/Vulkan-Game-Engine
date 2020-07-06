@@ -5,6 +5,8 @@
 #include <renderer/GraphicEngineConstants.hpp>
 #include <renderer/GameGraphicEngine.hpp>
 
+#include <tools/ResultHandler.hpp>
+
 #include <array>
 #include <memory>
 #include <mutex>
@@ -133,34 +135,39 @@ namespace noxcain
 	template<typename T>
 	void SubpassTask<T>::execute_task()
 	{
-		Watcher watcher( shutdown, task_mutex, task_condition );
+		Watcher watcher( [this]()
+		{
+			std::unique_lock lock( task_mutex );
+			shutdown = true;
+			task_condition.notify_all();
+		} );
 		ResultHandler<bool> result_handler( true );
 
 		while( !shutdown )
 		{
 			// wait for master signal to start
 			result_handler << wait_for_start();
-			if( result_handler.error() ) return;
+			if( result_handler.is_critical() ) return;
 
 			// make any neccessary preparations possible without knowing witch pool to use
 			result_handler << static_cast<T*>( this )->buffer_independent_preparation();
-			if( result_handler.error() ) return;
+			if( result_handler.is_critical() ) return;
 
 			// wait for master to select the next available pool
 			result_handler << wait_for_buffer();
-			if( result_handler.error() ) return;
+			if( result_handler.is_critical() ) return;
 
 			// make any neccessary preparations now wich need a pool id
 			result_handler << static_cast<T*>( this )->buffer_dependent_preparation( command_data[buffer_id] );
-			if( result_handler.error() ) return;
+			if( result_handler.is_critical() ) return;
 
 			// wait for master to give the signal that the framebuffer is finsihed
 			result_handler << wait_for_recording();
-			if( result_handler.error() ) return;
+			if( result_handler.is_critical() ) return;
 
 			// record the commands in the buffers of the selected pool
 			result_handler << static_cast<T*>( this )->record( command_data[buffer_id].buffers );
-			if( result_handler.error() ) return;
+			if( result_handler.is_critical() ) return;
 
 			// set the subtask state on finished and notify master
 			std::unique_lock<std::mutex> lock( task_mutex );
@@ -172,41 +179,33 @@ namespace noxcain
 	template<typename T>
 	inline bool SubpassTask<T>::buffer_preparation( CommandData& pool_data, std::size_t buffer_count )
 	{
-		ResultHandler<vk::Result> r_handle( vk::Result::eSuccess );
+		ResultHandler<vk::Result> r_handler( vk::Result::eSuccess );
 
 		vk::Device device = GraphicEngine::get_device();
 		if( !pool_data.pool )
 		{
-			pool_data.pool = r_handle << device.createCommandPool( vk::CommandPoolCreateInfo( vk::CommandPoolCreateFlagBits::eTransient, GraphicEngine::get_graphic_queue_family_index() ) );
-			if( r_handle.error() )
-			{
-				return false;
-			}
+			pool_data.pool = r_handler << device.createCommandPool( vk::CommandPoolCreateInfo( vk::CommandPoolCreateFlagBits::eTransient, GraphicEngine::get_graphic_queue_family_index() ) );
 		}
 		else
 		{
-			r_handle << device.resetCommandPool( pool_data.pool, vk::CommandPoolResetFlags() );
-			if( r_handle.error() )
-			{
-				return false;
-			}
+			r_handler << device.resetCommandPool( pool_data.pool, vk::CommandPoolResetFlags() );
 		}
 
-		if( pool_data.buffers.size() && pool_data.buffers.size() != buffer_count )
+		if( r_handler.all_okay() )
 		{
-			device.freeCommandBuffers( pool_data.pool, pool_data.buffers );
-			pool_data.buffers.clear();
-		}
 
-		if( pool_data.buffers.empty() )
-		{
-			pool_data.buffers = r_handle << device.allocateCommandBuffers( vk::CommandBufferAllocateInfo( pool_data.pool, vk::CommandBufferLevel::eSecondary, buffer_count ) );
-			if( !r_handle.all_okay() )
+			if( pool_data.buffers.size() && pool_data.buffers.size() != buffer_count )
 			{
-				return false;
+				device.freeCommandBuffers( pool_data.pool, pool_data.buffers );
+				pool_data.buffers.clear();
+			}
+
+			if( pool_data.buffers.empty() )
+			{
+				pool_data.buffers = r_handler << device.allocateCommandBuffers( vk::CommandBufferAllocateInfo( pool_data.pool, vk::CommandBufferLevel::eSecondary, buffer_count ) );
 			}
 		}
-		return true;
+		return r_handler.all_okay();
 	}
 
 	template<typename T>

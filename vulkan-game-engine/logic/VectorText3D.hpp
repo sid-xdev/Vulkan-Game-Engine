@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>
 #include <array>
-#include <vulkan\vulkan.hpp>
+#include <vulkan/vulkan.hpp>
 
 namespace noxcain
 {	

@@ -1,0 +1,23 @@
+#pragma once
+
+${SHADER_INCLUDES}
+namespace noxcain
+{
+	enum class VertexShaderIds
+	{
+${VERTEX_SHADER_ENUMS}
+	};
+	constexpr UINT32 VERTEX_SHADER_COUNT = ${VERTEX_SHADER_COUNT};
+
+	enum class FragmentShaderIds
+	{
+${FRAGMENT_SHADER_ENUMS}
+	};
+	constexpr UINT32 FRAGMENT_SHADER_COUNT = ${FRAGMENT_SHADER_COUNT};
+
+	enum class ComputeShaderIds
+	{
+${COMPUTE_SHADER_ENUMS}
+	};
+	constexpr UINT32 COMPUTE_SHADER_COUNT = ${COMPUTE_SHADER_COUNT};
+}

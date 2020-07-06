@@ -25,6 +25,12 @@ namespace noxcain
 		{
 			scissor = scissor_;
 		}
+
+		const Region* get_scissor() const
+		{
+			return scissor;
+		}
+
 		void set_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha );
 		void set_color( const std::array<FLOAT32, 4>& label_color );
 		const std::array<FLOAT32, 4>& get_color() const

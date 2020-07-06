@@ -68,7 +68,7 @@ namespace noxcain
 		std::vector<GeometryResource> indexed_geometry_objects;
 		
 		void read_hex_geometry();
-		void read_font( const std::vector<std::string>& font_path );
+		void read_font( const std::vector<std::string>& font_paths );
 
 		std::size_t addSubResource( std::size_t resource_size, GameSubResource::SubResourceType resource_type );
 	};
