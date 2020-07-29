@@ -29,6 +29,8 @@ namespace noxcain
 		}
 
 		void set_utf8( const std::string& utf8String );
+		void set_unicodes( const std::vector<UINT32>& new_unicodes );
+
 		void set_size( DOUBLE size )
 		{
 			this->size = size;
@@ -66,6 +68,11 @@ namespace noxcain
 		const std::array<FLOAT32, 4>& get_color() const
 		{
 			return colors[0];
+		}
+
+		const std::vector<UINT32>& get_unicodes() const
+		{
+			return unicodes;
 		}
 	
 	private:

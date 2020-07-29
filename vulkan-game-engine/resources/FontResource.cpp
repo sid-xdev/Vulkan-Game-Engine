@@ -41,7 +41,7 @@ const noxcain::BoundingBox noxcain::FontResource::getCharBoundingBox( UINT32 uni
 		return BoundingBox();
 	}
 	std::array<FLOAT32, 8> glyphQuad;
-	ResourceEngine::get_engine().get_subresources()[vertex_resource_id].getData( glyphQuad.data(), 8 * sizeof( FLOAT32 ), std::size_t( characterInfos[charIndex].glyph_index ) * 8 * sizeof( FLOAT32 ) );
+	ResourceEngine::get_engine().get_subresources()[vertex_resource_id].getData( glyphQuad.data(), 8 * sizeof( FLOAT32 ), std::size_t( font_offset + characterInfos[charIndex].glyph_index ) * 8 * sizeof( FLOAT32 ) );
 	
 	return BoundingBox( glyphQuad[0], glyphQuad[7], 0.0, glyphQuad[6], glyphQuad[1], 0.0 );
 }

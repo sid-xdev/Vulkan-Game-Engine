@@ -328,37 +328,40 @@ bool noxcain::OverlayTask::record( const std::vector<vk::CommandBuffer>& buffers
 		vk::Rect2D default_scissor( vk::Offset2D( 0, 0 ), GraphicEngine::get_window_resolution() );
 		vk::Rect2D current_scissor;
 
-		const auto& label_list = LogicEngine::get_color_labels();
-		if( !label_list.empty() )
+		const auto& uis = LogicEngine::get_user_interfaces();
+
+
+
+		for( const GameUserInterface& ui : uis )
 		{
-			// labels
-			overlay_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, label_pipeline );
-
-			vk::Rect2D last_scissor;
-			for( const Renderable<RenderableQuad2D>::List& labels : label_list )
+			auto label_iter = ui.labels.begin();
+			auto text_iter = ui.texts.begin();
+			UINT32 order_index = 0;
+			while( order_index < ui.depth_order.size() )
 			{
-				for( const RenderableQuad2D& label : labels )
+				const UINT32 label_count = ui.depth_order[order_index][0];
+				if( label_count )
 				{
-					last_scissor = label.record( overlay_buffer, label_pipeline_layout, last_scissor, default_scissor );
+					overlay_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, label_pipeline );
 				}
-			}
-		}
-
-		const auto& text_list = LogicEngine::get_vector_labels();
-		if( !text_list.empty() )
-		{
-			// texts
-			const auto& vertex_block_info = GraphicEngine::get_memory_manager().get_block( ResourceEngine::get_engine().get_font( 0 ).getVertexBlockId() );
-			overlay_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, text_pipeline );
-			overlay_buffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, text_pipeline_layout, 0, { GraphicEngine::get_descriptor_set_manager().get_basic_set( BasicDescriptorSets::GLYPHS ) }, {} );
-			overlay_buffer.bindVertexBuffers( 0, { vertex_block_info.buffer }, { vertex_block_info.offset } );
-
-			for( const Renderable<VectorText2D>::List& text : text_list )
-			{
-				for( const VectorText2D& string : text )
+				for( UINT32 index = 0; index < label_count; ++index, ++label_iter )
 				{
-					current_scissor = string.record( overlay_buffer, text_pipeline_layout, current_scissor, default_scissor );
+					current_scissor = label_iter->get().record( overlay_buffer, label_pipeline_layout, current_scissor, default_scissor );
 				}
+
+				const UINT32 text_count = ui.depth_order[order_index][1];
+				if( text_count )
+				{
+					const auto& vertex_block_info = GraphicEngine::get_memory_manager().get_block( ResourceEngine::get_engine().get_font( 0 ).getVertexBlockId() );
+					overlay_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, text_pipeline );
+					overlay_buffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, text_pipeline_layout, 0, { GraphicEngine::get_descriptor_set_manager().get_basic_set( BasicDescriptorSets::GLYPHS ) }, {} );
+					overlay_buffer.bindVertexBuffers( 0, { vertex_block_info.buffer }, { vertex_block_info.offset } );
+				}
+				for( UINT32 index = 0; index < text_count; ++index, ++text_iter )
+				{
+					current_scissor = text_iter->get().record( overlay_buffer, text_pipeline_layout, current_scissor, default_scissor );
+				}
+				++order_index;
 			}
 		}
 
@@ -376,7 +379,7 @@ bool noxcain::OverlayTask::build_text_pipeline()
 	ResultHandler<vk::Result> r_handler( vk::Result::eSuccess );
 	const vk::Extent2D& extent = GraphicEngine::get_window_resolution();
 
-	auto special = createSpecialization( FLOAT32( 2.0F / extent.width ), FLOAT32( 2.0F / extent.height ), UINT32( ResourceEngine::get_engine().get_resource_limits().glyph_count ) );
+	auto special = createSpecialization( FLOAT32( 2.0F / extent.width ), FLOAT32( -2.0F / extent.height ), UINT32( ResourceEngine::get_engine().get_resource_limits().glyph_count ) );
 	vk::SpecializationInfo specializationInfo( special.descriptions.size(), special.descriptions.data(), special.data.size(), special.data.data() );
 
 	std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages =

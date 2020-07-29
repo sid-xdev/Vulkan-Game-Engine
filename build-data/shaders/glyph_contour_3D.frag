@@ -108,7 +108,7 @@ bool testRoot2( const ivec2 code )
 	return code.y < 0;
 }
 
-const float MAX_SAMPLE_COUNT = 8.0F;
+const float MAX_SAMPLE_COUNT = 4.0F;
 
 void main()
 {	

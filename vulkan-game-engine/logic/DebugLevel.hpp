@@ -18,8 +18,7 @@ namespace noxcain
 	{
 	private:
 
-		Renderable<RenderableQuad2D>::List label_list;
-		Renderable<VectorText2D>::List text_list;
+		GameUserInterface ui;
 
 		class TimeFrameLabel : public RegionalEventRecieverNode
 		{

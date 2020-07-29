@@ -16,9 +16,14 @@ namespace noxcain
 		Iterator end() const;
 		Iterator insert( const T& renderable );
 		void erase( const Iterator& slider_position );
-		void sort( const std::function<bool( const T&, const T& )>& compare );
+		bool sort( const std::function<bool( const T&, const T& )>& compare );
 	private:
-		bool need_order = true;
+		enum class Status
+		{
+			NEED_NOTHING,
+			NEED_SORT,
+			NEED_MATCH
+		} status;
 	};
 	
 	template<typename T>
@@ -124,22 +129,28 @@ namespace noxcain
 	template<typename T>
 	inline typename RenderableList<T>::Iterator RenderableList<T>::insert( const T& renderable )
 	{
-		need_order = true;
+		status = Status::NEED_SORT;
 		return BaseList::emplace( BaseList::begin(), renderable );
 	}
 	template<typename T>
 	inline void RenderableList<T>::erase( const Iterator& slider_position )
 	{
 		BaseList::erase( slider_position );
+		if( status == Status::NEED_NOTHING )
+		{
+			status = Status::NEED_MATCH;
+		}
 	}
 
 	template<typename T>
-	inline void RenderableList<T>::sort( const std::function<bool( const T&, const T& )>& compare )
+	inline bool RenderableList<T>::sort( const std::function<bool( const T&, const T& )>& compare )
 	{
-		if( need_order )
+		if( status == Status::NEED_SORT )
 		{
 			BaseList::sort( compare );
-			need_order = false;
 		}
+		bool need_match = status != Status::NEED_NOTHING;
+		status = Status::NEED_NOTHING;
+		return need_match;
 	}
 }

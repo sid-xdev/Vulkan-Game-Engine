@@ -5,6 +5,7 @@
 #include <math/Vector.hpp>
 
 #include <logic/Renderable.hpp>
+#include <logic/Level.hpp>
 
 #include <memory>
 #include <thread>
@@ -80,13 +81,10 @@ namespace noxcain
 		static NxMatrix4x4 get_camera_matrix();
 
 		static void set_graphic_settings( UINT32 sampleCount, FLOAT32 superSamplingFactor, UINT32 width, UINT32 height );
-
-		template<typename T>
-		using RenderableContainer = std::vector<std::reference_wrapper<typename Renderable<T>::List>>;
-		static const RenderableContainer<VectorText2D>& get_vector_labels();
-		static const RenderableContainer<GeometryObject>& get_geometry_objects();
-		static const RenderableContainer<VectorText3D>& get_vector_decals();
-		static const RenderableContainer<RenderableQuad2D>& get_color_labels();
+		
+		static const GameLevel::RenderableContainer<VectorText3D>& get_vector_decals();
+		static const GameLevel::RenderableContainer<GeometryObject>& get_geometry_objects();
+		static const GameLevel::UserInterfaceContainer& get_user_interfaces();
 
 		static void set_event( InputEventTypes type, INT32 param1, INT32 param2 = 0, UINT32 param3 = 0 );
 

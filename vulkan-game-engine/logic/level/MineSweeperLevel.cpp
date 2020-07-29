@@ -9,6 +9,7 @@
 #include <logic/VectorText3D.hpp>
 
 #include <logic/gui/Button.hpp>
+#include <logic/gui/Label.hpp>
 
 #include <resources/BoundingBox.hpp>
 #include <resources/GameResourceEngine.hpp>
@@ -18,31 +19,62 @@
 
 #include <cmath>
 
+void noxcain::MineSweeperLevel::create_settings()
+{
+	const auto settings = LogicEngine::get_graphic_settings();
+	/*
+	//exit button;
+	get_screen_root().add_branch( *exit_button );
+	exit_button->get_area().set_top_anchor( get_screen_root(), -5.0 );
+	exit_button->get_area().set_right_anchor( get_screen_root(), -5.0 );
+
+	exit_button->set_background_color( 1.0F, 1.0F, 1.0F );
+	exit_button->set_highlight_color( 0.5F, 0.5F, 0.5F );
+	exit_button->set_active_color( 0.0F, 0.0F, 0.0F );
+	exit_button->get_text_element().set_color( 0.0F, 0.0F, 0.0F );
+	exit_button->get_text_element().set_utf8( "X" );
+	exit_button->get_text_element().set_size( 24 );
+	exit_button->set_text_alignment( VectorTextLabel2D::VerticalTextAlignments::CENTER );
+	exit_button->set_text_alignment( VectorTextLabel2D::HorizontalTextAlignments::CENTER );
+	exit_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::HEIGHT );
+	exit_button->get_area().set_width( exit_button->get_area().get_height() );
+	exit_button->set_frame_size( 1 );
+	exit_button->set_frame_color( 0.0, 0.0, 0.0 );
+	*/
+	sampling_description_label->get_area().set_top_anchor( get_screen_root(), -20 );
+	sampling_description_label->get_area().set_left_anchor( get_screen_root(), 20 );
+
+	sampling_description_label->set_background_color( 0.5, 0.5, 0.5, 1.0 );
+	sampling_description_label->get_text_element().set_size( 24 );
+	sampling_description_label->get_text_element().set_utf8( "AntiAlaising" );
+}
+
 noxcain::MineSweeperLevel::MineSweeperLevel() :
 	//fieldOrientationSpline( std::make_unique<CubicSpline>() ),
-	camera_distance_label( std::make_unique<VectorText2D>( vector_label_list ) ),
-	cpu_cycle_label( std::make_unique<VectorText2D>( vector_label_list ) ),
-	gpu_cycle_label( std::make_unique<VectorText2D>( vector_label_list ) ),
-	debug_button( std::make_unique<BaseButton>( vector_label_list, color_label_list ) ),
-	switch_font_button( std::make_unique<BaseButton>( vector_label_list, color_label_list ) )
+	cpu_cycle_label( std::make_unique<VectorText2D>( default_ui.texts ) ),
+	gpu_cycle_label( std::make_unique<VectorText2D>( default_ui.texts ) ),
+	debug_button( std::make_unique<BaseButton>( default_ui ) ),
+	switch_font_button( std::make_unique<BaseButton>( default_ui ) ),
+	exit_button( std::make_unique<BaseButton>( default_ui ) ),
+
+	sampling_description_label( std::make_unique<VectorTextLabel2D>( settings_ui ) ),
+	sampling_description_value( std::make_unique<VectorTextLabel2D>( settings_ui ) ),
+	sampling_decrease_button( std::make_unique<BaseButton>( settings_ui ) ),
+	sampling_increase_button( std::make_unique<BaseButton>( settings_ui ) )
 {
+	time_collector.name_collection( "Level logic" );
+
 	vector_decal_renderables.emplace_back( vector_dacal_list );
-	color_label_renderables.emplace_back( color_label_list );
 	geometry_renderables.emplace_back( geometry_list );
-	vector_label_renderables.emplace_back( vector_label_list );
-	
-	//camera distance label
-	camera_distance_label->set_top_anchor( get_screen_root() );
-	camera_distance_label->set_right_anchor( get_screen_root() );
-	camera_distance_label->set_anchor( get_screen_root(), HorizontalAnchorType::RIGHT, VerticalAnchorType::TOP, HorizontalAnchorType::RIGHT, VerticalAnchorType::TOP );
-	camera_distance_label->get_text().set_size( 24 );
+
+	user_interfaces.emplace_back( default_ui );
 
 	//fps displays
 	cpu_cycle_label->set_top_anchor( get_screen_root() );
 	gpu_cycle_label->set_vertical_anchor( VerticalAnchorType::TOP, *cpu_cycle_label, VerticalAnchorType::BOTTOM );
 
-	cpu_cycle_label->set_left_anchor( get_screen_root() );
-	gpu_cycle_label->set_left_anchor( get_screen_root() );
+	cpu_cycle_label->set_left_anchor( get_screen_root(), 5 );
+	gpu_cycle_label->set_left_anchor( get_screen_root(), 5 );
 
 	cpu_cycle_label->get_text().set_size( 24 );
 	gpu_cycle_label->get_text().set_size( 24 );
@@ -53,27 +85,37 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 
 	setup_level();
 
-	
+	//exit button;
+	get_screen_root().add_branch( *exit_button );
+	exit_button->get_area().set_top_anchor( get_screen_root(), -10.0 );
+	exit_button->get_area().set_right_anchor( get_screen_root(), -10.0 );
+	exit_button->get_text_element().set_font_id( 2 );
+	exit_button->set_auto_resize();
+	exit_button->get_text_element().set_size( 45 );
+	exit_button->get_text_element().set_unicodes( { 0xF335 } );
+	//exit_button->set_centered_icon( 45, 61696 );
+
+	exit_button->set_down_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
+	{
+		set_status( Status::FINISHED );
+		return true;
+	} );
+#ifndef __ANDROID__
+	exit_button->show();
+#endif
 
 	// add debug button
 	get_screen_root().add_branch( *debug_button );
-	debug_button->get_area().set_bottom_anchor( get_screen_root(), 30 );
-	debug_button->get_area().set_right_anchor( get_screen_root(), -30 );
+	debug_button->get_area().set_vertical_anchor( VerticalAnchorType::TOP, *switch_font_button, VerticalAnchorType::BOTTOM, -5 );
+	debug_button->get_area().set_left_anchor( get_screen_root(), 5 );
 	debug_button->get_area().set_width( 100 );
 	debug_button->get_area().set_height( 40 );
 
-	debug_button->set_background_color( 0.4F, 0.4F, 0.4F );
-	debug_button->set_highlight_color( 0.6F, 0.6F, 0.6F, 1.0F );
-	debug_button->set_active_color( 0.8F, 0.8F, 0.8F );
-	debug_button->get_text_element().set_color( 0.0F, 0.0F, 0.0F );
 	debug_button->get_text_element().set_utf8( "PROFIL" );
 	debug_button->get_text_element().set_size( 24 );
 	debug_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::FULL );
-	debug_button->set_frame_size( 2 );
-	//debug_button->set_frame_color( 0.35, 0.35, 0.35 );
-	debug_button->set_frame_color( 1.0, 1.0, 1.0 );
 
-	debug_button->set_click_handler( []( const RegionalKeyEvent&, BaseButton& ) -> bool
+	debug_button->set_click_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
 	{
 		LogicEngine::show_performance_overlay();
 		return true;
@@ -83,21 +125,13 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 
 	// add switch Font Button
 	get_screen_root().add_branch( *switch_font_button );
-	switch_font_button->get_area().set_bottom_anchor( get_screen_root(), 30 );
-	switch_font_button->get_area().set_left_anchor( get_screen_root(), 30 );
+	switch_font_button->get_area().set_vertical_anchor( VerticalAnchorType::TOP, *gpu_cycle_label, VerticalAnchorType::BOTTOM, -5 );
+	switch_font_button->get_area().set_left_anchor( get_screen_root(), 5 );
 	switch_font_button->get_area().set_width( 100 );
 	switch_font_button->get_area().set_height( 40 );
-
-	switch_font_button->set_background_color( 0.4F, 0.4F, 0.4F );
-	switch_font_button->set_highlight_color( 0.6F, 0.6F, 0.6F, 1.0F );
-	switch_font_button->set_active_color( 0.8F, 0.8F, 0.8F );
-	switch_font_button->get_text_element().set_color( 0.0F, 0.0F, 0.0F );
 	switch_font_button->get_text_element().set_utf8( "SWITCH FONT" );
 	switch_font_button->get_text_element().set_size( 24 );
 	switch_font_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::FULL );
-	switch_font_button->set_frame_size( 2 );
-	switch_font_button->set_frame_color( 1.0, 1.0, 1.0 );
-	//switch_font_button->set_frame_color( 1.0, 0, 0 );
 
 	switch_font_button->set_click_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
 	{
@@ -115,7 +149,7 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 
 	switch_font_button->show();
 
-	camera_distance_label->show();
+	create_settings();
 }
 
 noxcain::MineSweeperLevel::~MineSweeperLevel()
@@ -171,7 +205,7 @@ void noxcain::MineSweeperLevel::setup_level()
 
 	//hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
 
-	hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
+	//hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
 	/*
 	while( current_step <= 1.0 )
 	{
@@ -191,32 +225,31 @@ void noxcain::MineSweeperLevel::setup_level()
 	}
 	*/
 	//NxMatrix4x4 centering = NxMatrix4x4().translation( { -0.5 * rowLength + hexSideLength,0,0 } );
-	//for( std::size_t index = 0; index < 11/*index < UINT32( 0.5 * rowCount + rowCount % 2 + 2 )*/; ++index )
-	/*	
-	{
-		//for( std::size_t line = 0; line < columnCount; ++line )
-		{
+	
+	DOUBLE start_left = -5;
+	DOUBLE start_top = -5;
 
-			//trans.translation( { line * 1.5 * hexSideLength, 0, 0 } );
-			
+	for( std::size_t row_index = 0; row_index < 5; ++row_index )
+	{
+		for( std::size_t column_index = 0; column_index < 5; ++column_index )
+		{
 			hex_fields.emplace_back( std::make_unique<HexField>( *this ) );
 			auto& current_hex = hex_fields.back();
-			
-			
-			
 
-			const NxVector3D x_axis( 0.0, 0.0, 1.0 );
-			const NxVector3D& y_axis = curve.get_direction( step_width * index );
-
-			NxMatrix4x4 position( y_axis.cross( x_axis ).normalize(), y_axis, x_axis, curve.get_position( step_width * index ) );
+			const auto& hex_bounding_box = HexField::get_object_space_bounding_box();
+			NxMatrix4x4 position;
+			position.translation(
+				{
+					start_left + column_index * 0.75* hex_bounding_box.get_width(),
+					start_top + row_index * hex_bounding_box.get_height() + ( column_index%2 ? 0.0 : 0.5*hex_bounding_box.get_height() ),
+					0
+				} );
 
 			current_hex->set_local_matrix( position );
 			//current_hex->set_local_matrix( centering * trans * NxMatrix4x4().rotation( { 1,0,0 }, -0.5*PI + lineAngle*(index + ( line % 2 ) * 0.5 - 1 ) ) * NxMatrix4x4().translation( { 0,0,realRadius + 0.5 } ) );
 			current_hex->set_mine_number( count++ );
-			//current_hex->set_mine_neighbor_count( index % 7 );
 		}
 	}
-	*/
 	camera_screen_width = /*2.0**/radius;
 	camera_space_near = 0.5*radius;
 	camera_space_far = camera_space_near + rowLength;
@@ -357,27 +390,38 @@ void noxcain::MineSweeperLevel::update_level_logic( const std::chrono::nanosecon
 		gpu_cycle_label->get_text().set_utf8( "GPU: " + std::to_string( std::chrono::seconds( 1 ) / LogicEngine::get_gpu_cycle_duration() ) + " fps" );
 		cycle_display_wait_time = std::chrono::nanoseconds( 0 );
 	}
-	DOUBLE xx = 0.5*std::chrono::duration_cast<std::chrono::duration<DOUBLE>>( deltaTime ).count();
-	progress += xx;
-	while( progress > 1.0 ) progress -= 1.0;
 
 	check_events( deltaTime );
 	update_camera();
 
-	camera_distance_label->get_text().set_utf8( std::to_string( camera_center_distance ) );
+	DOUBLE delta = std::chrono::duration_cast<std::chrono::duration<DOUBLE>>( deltaTime ).count();
 
-	auto& current_hex = hex_fields.back();
-	auto& spline = splines.back();
+	NxMatrix4x4 direction_change;
+	direction_change.rotationZ( 2.0*delta * ( std::rand()%2 ? -1.0 : 1.0 ) );
+	NxMatrix4x4 dummy;
+	dummy[0] = last_direction[0];
+	dummy[1] = last_direction[1];
+	dummy[2] = last_direction[2];
+	dummy = dummy * direction_change;
+	last_direction[0] = dummy[0];
+	last_direction[1] = dummy[1];
+	last_direction[2] = dummy[2];
+	last_direction.normalize();
 
-	auto end_point = spline.get_position( 1.0 );
+	last_position = last_position + 5.0 * delta * last_direction;
 
-	const NxVector3D y_axis = spline.get_direction( progress );
-	const NxVector3D z_axis = NxVector3D( 1.0, 0.0, 0.0 ).cross( y_axis ).normalize();
-	const NxVector3D x_axis = y_axis.cross( z_axis ).normalize();
+	for( auto& hex : hex_fields )
+	{
+		auto matrix = hex->get_local_matrix();
+		
+		NxVector3D location( matrix[12], matrix[13], 0 );
+		matrix[14] = std::max( 0.0, 30.0 - ( location - last_position ).get_length() ) / 30.0 * 7;
+		hex->set_local_matrix( matrix );
+	}
 
-	NxMatrix4x4 position( x_axis, y_axis, z_axis, spline.get_position( progress ) );
-
-	current_hex->set_local_matrix( position.translation( NxVector3D( 0, 0, -HexField::get_object_space_bounding_box().get_depth() ) ) );
-	current_hex->set_mine_number( progress * 100.0 );
+	if( last_position[0] < -50 || last_position[0] > 50 ||last_position[1] < -30 || last_position[1] > 30 )
+	{
+		last_direction = -last_direction;
+	}
 }
 

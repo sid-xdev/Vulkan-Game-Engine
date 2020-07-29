@@ -59,7 +59,7 @@ namespace noxcain
 		DOUBLE get_slider_working_area_length() const;
 		void make_scalable( DOUBLE relative_min_slider_size );
 
-		ScrollBarBase( DOUBLE frame_size, RenderableList<RenderableQuad2D>& label_list, RenderableList<VectorText2D>& text_list, RegionalEventExclusivTracer& tracer );
+		ScrollBarBase( DOUBLE frame_size, GameUserInterface& ui, RegionalEventExclusivTracer& tracer );
 		RegionalEventExclusivTracer& drag_tracer;
 
 		DOUBLE slider_move_start = 0;
@@ -89,7 +89,7 @@ namespace noxcain
 	class HorizontalScrollBar final : public ScrollBarBase
 	{
 	public:
-		HorizontalScrollBar( DOUBLE frame_size, RenderableList<RenderableQuad2D>& label_list, RenderableList<VectorText2D>& text_list, RegionalEventExclusivTracer& tracer );
+		HorizontalScrollBar( DOUBLE frame_size, GameUserInterface& ui, RegionalEventExclusivTracer& tracer );
 
 		///<summary> activates the ability of the slider to be rescaled </summary>
 		///<param name="relative_min_slider_size"> used to define the minimal size of the silder
@@ -106,7 +106,7 @@ namespace noxcain
 	class VerticalScrollBar final : public ScrollBarBase
 	{
 	public:
-		VerticalScrollBar( DOUBLE frame_size, RenderableList<RenderableQuad2D>& label_list, RenderableList<VectorText2D>& text_list, RegionalEventExclusivTracer& tracer );
+		VerticalScrollBar( DOUBLE frame_size, GameUserInterface& ui, RegionalEventExclusivTracer& tracer );
 
 		///<summary> activates the ability of the slider to be rescaled </summary>
 		///<param name="relative_min_slider_size"> used to define the minimal size of the silder

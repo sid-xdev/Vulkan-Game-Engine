@@ -8,14 +8,16 @@
 namespace noxcain
 {	
 	class BaseButton;
+	class VectorTextLabel2D;
 
 	class MineSweeperLevel : public GameLevel
 	{
 	private:
 		Renderable<VectorText3D>::List vector_dacal_list;
 		Renderable<GeometryObject>::List geometry_list;
-		Renderable<RenderableQuad2D>::List color_label_list;
-		Renderable<VectorText2D>::List vector_label_list;
+		
+		GameUserInterface default_ui;
+		GameUserInterface settings_ui;
 
 		std::vector<CubicSpline> splines;
 		DOUBLE progress = 0.0;
@@ -70,8 +72,6 @@ namespace noxcain
 
 		void setup_level();
 
-		std::unique_ptr<VectorText2D> camera_distance_label;
-
 		//FPS DISPLAY
 		constexpr static std::chrono::nanoseconds CYCLE_TIME_DISPLAY_REFRESH_RATE = std::chrono::seconds( 1 );
 		std::chrono::nanoseconds cycle_display_wait_time = std::chrono::nanoseconds::zero();
@@ -81,7 +81,20 @@ namespace noxcain
 		//TEST BUTTONS
 		std::unique_ptr<BaseButton> debug_button;
 		std::unique_ptr<BaseButton> switch_font_button;
+		std::unique_ptr<BaseButton> exit_button;
 
+		NxVector3D last_position;
+		NxVector3D last_direction;
+
+		/// <summary>
+		/// Iniatlized HUD objects for the graphic settings
+		/// </summary>
+		void create_settings();
+
+		std::unique_ptr<VectorTextLabel2D> sampling_description_label;
+		std::unique_ptr<VectorTextLabel2D> sampling_description_value;
+		std::unique_ptr<BaseButton> sampling_increase_button;
+		std::unique_ptr<BaseButton> sampling_decrease_button;
 	public:
 		MineSweeperLevel();
 		~MineSweeperLevel();

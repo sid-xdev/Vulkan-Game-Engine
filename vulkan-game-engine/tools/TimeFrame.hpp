@@ -62,12 +62,14 @@ namespace noxcain
 		static std::mutex frame_mutex;
 		static bool is_activ;
 
-		const std::size_t id;
+		std::size_t id = 0;
 		TimeFrameData current_time_frame;
 	public:
+		TimeFrameCollector();
 		TimeFrameCollector( std::string name );
 		TimeFrameCollector( std::size_t id );
 		
+		void name_collection( std::string name );
 		void start_frame( DOUBLE red, DOUBLE green, DOUBLE blue, DOUBLE alpha = 1.0, const std::string& description = "" );
 		void end_frame();
 		void end_is_start( DOUBLE red, DOUBLE green, DOUBLE blue, DOUBLE alpha = 1.0, const std::string& description = "" );

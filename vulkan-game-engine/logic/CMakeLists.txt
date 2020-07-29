@@ -15,6 +15,7 @@ target_sources( logiclib
 		VectorText3D.cpp
 		VectorText.cpp
 		DebugLevel.cpp
+		UserInterface.cpp
 )
 
 target_sources( logiclib 
@@ -33,6 +34,7 @@ target_sources( logiclib
 		DebugLevel.hpp
 		Renderable.hpp
 		TreeNode.hpp
+		UserInterface.hpp
 )	
 
 add_subdirectory( level )

@@ -1,12 +1,13 @@
 #pragma once
-#include <logic/Quad2D.hpp>
-#include <logic/VectorText2D.hpp>
+#include <logic/Level.hpp>
 namespace noxcain
 {
+	struct GameUserInterface;
+	
 	class VectorTextLabel2D
 	{
 	public:
-		VectorTextLabel2D( RenderableList<VectorText2D>& text_list, RenderableList<RenderableQuad2D>& label_list );
+		VectorTextLabel2D( GameUserInterface& ui );
 
 		enum class HorizontalTextAlignments
 		{
@@ -69,6 +70,8 @@ namespace noxcain
 		void set_frame_size( DOUBLE size );
 		void set_frame_color( DOUBLE red, DOUBLE green, DOUBLE blue, DOUBLE alpha = 1.0 );
 		void set_background_color( DOUBLE red, DOUBLE green, DOUBLE blue, DOUBLE alpha = 1.0 );
+
+		void set_centered_icon( DOUBLE size, UINT32 unicode );
 
 		virtual void hide();
 		virtual void show();

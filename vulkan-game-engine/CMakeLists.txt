@@ -15,8 +15,6 @@ if( ${CMAKE_SYSTEM_NAME} STREQUAL "Windows" )
 	add_subdirectory( windows )
 endif()
 
-add_custom_target(genexdebug COMMAND ${CMAKE_COMMAND} -E echo "$<PLATFORM_ID:Android>")
-
 if( ${CMAKE_SYSTEM_NAME} STREQUAL "Android" )
 	message( "ANDROID" )
 	add_library(native_app_glue STATIC ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
@@ -29,8 +27,6 @@ if( ${CMAKE_SYSTEM_NAME} STREQUAL "Android" )
 	
 	add_subdirectory( android )
 endif()
-
-
 
 add_subdirectory( math )
 add_subdirectory( tools )

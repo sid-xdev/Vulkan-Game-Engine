@@ -11,7 +11,7 @@ namespace noxcain
 	public:
 		using Handler = std::function<bool( const RegionalKeyEvent& regional_event, BaseButton& event_reciever )>;
 
-		BaseButton( RenderableList<VectorText2D>& text_list, RenderableList<RenderableQuad2D>& label_list );
+		BaseButton( GameUserInterface& ui );
 		~BaseButton() override
 		{
 		}
@@ -19,7 +19,7 @@ namespace noxcain
 		void set_background_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha = 1.0 )
 		{
 			normal_color = { red, green, blue, alpha };
-			background.set_color( normal_color );
+			VectorTextLabel2D::set_background_color( red, green, blue, alpha );
 		}
 		void set_highlight_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha = 1.0 )
 		{
@@ -32,11 +32,6 @@ namespace noxcain
 		void set_deactive_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha = 1.0 )
 		{
 			inactive_color = { red, green, blue, alpha };
-		}
-
-		void set_frame_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha = 1.0 )
-		{
-			frame.set_color( red, green, blue, alpha );
 		}
 
 		void set_inactive_text_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha = 1.0 )

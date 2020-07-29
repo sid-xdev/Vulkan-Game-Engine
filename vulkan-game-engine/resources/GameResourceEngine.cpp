@@ -7,6 +7,7 @@
 #include <math/Vector.hpp>
 
 #include <cmath>
+#include <algorithm>
 
 std::unique_ptr<noxcain::ResourceEngine> noxcain::ResourceEngine::resources;
 
@@ -222,10 +223,10 @@ void noxcain::ResourceEngine::read_hex_geometry()
 		DOUBLE anchor2X = ( sideLength - cornerRadius ) * cornerDirections[index].first + offset * cornerDirections[( index + 2 ) % nCorners].first;
 		DOUBLE anchor2Y = ( sideLength - cornerRadius ) * cornerDirections[index].second + offset * cornerDirections[( index + 2 ) % nCorners].second;
 
-		maxX = std::max( maxX, std::max( anchor1X, anchor2X ) );
-		maxY = std::max( maxY, std::max( anchor1Y, anchor2Y ) );
-		minX = std::min( minX, std::min( anchor1X, anchor2X ) );
-		minY = std::min( minY, std::min( anchor1Y, anchor2Y ) );
+		maxX = std::max<DOUBLE>( maxX, std::max<DOUBLE>( anchor1X, anchor2X ) );
+		maxY = std::max<DOUBLE>( maxY, std::max<DOUBLE>( anchor1Y, anchor2Y ) );
+		minX = std::min<DOUBLE>( minX, std::min<DOUBLE>( anchor1X, anchor2X ) );
+		minY = std::min<DOUBLE>( minY, std::min<DOUBLE>( anchor1Y, anchor2Y ) );
 
 		hexagonVertices[valueIndex++] = 0;
 		hexagonVertices[valueIndex++] = 0;
@@ -252,10 +253,10 @@ void noxcain::ResourceEngine::read_hex_geometry()
 			anchor2X += cornerRadius * cornerDirections[index].first;
 			anchor2Y += cornerRadius * cornerDirections[index].second;
 
-			maxX = std::max( maxX, std::max( anchor1X, anchor2X ) );
-			maxY = std::max( maxY, std::max( anchor1Y, anchor2Y ) );
-			minX = std::min( minX, std::min( anchor1X, anchor2X ) );
-			minY = std::min( minY, std::min( anchor1Y, anchor2Y ) );
+			maxX = std::max<DOUBLE>( maxX, std::max<DOUBLE>( anchor1X, anchor2X ) );
+			maxY = std::max<DOUBLE>( maxY, std::max<DOUBLE>( anchor1Y, anchor2Y ) );
+			minX = std::min<DOUBLE>( minX, std::min<DOUBLE>( anchor1X, anchor2X ) );
+			minY = std::min<DOUBLE>( minY, std::min<DOUBLE>( anchor1Y, anchor2Y ) );
 
 			const auto& direction1 = cornerDirections[( index + nCorners - 2 ) % nCorners];
 			const auto& direction2 = cornerDirections[( index + nCorners - 1 ) % nCorners];
@@ -376,7 +377,7 @@ std::size_t noxcain::ResourceEngine::addSubResource( std::size_t resourceSize, G
 {
 	std::size_t index = subresources.size();
 	subresources.emplace_back( resourceSize, resourceType );
-	resource_limits.max_size_per_resource = std::max( resource_limits.max_size_per_resource, resourceSize );
+	resource_limits.max_size_per_resource = std::max<std::size_t>( resource_limits.max_size_per_resource, resourceSize );
 	return index;
 }
 
@@ -384,10 +385,11 @@ noxcain::ResourceEngine::ResourceEngine()
 {
 	read_font( 
 		{
-			"Assets/Fonts/OpenSans-Regular.ttf",
-			"Assets/Fonts/28 Days Later.ttf",
-			"Assets/Fonts/Ornaments Salad.otf",
-			//"Assets/Fonts/zenda.ttf"
+			"Fonts/OpenSans-Regular.ttf",
+			"Fonts/dashicons.ttf",
+			"Fonts/28 Days Later.ttf",
+			"Fonts/Ornaments Salad.otf",
+			"Fonts/zenda.ttf"
 		} );
 	read_hex_geometry();
 }

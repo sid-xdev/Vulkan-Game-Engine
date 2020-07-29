@@ -6,6 +6,12 @@
 #include <algorithm>
 #include <cmath>
 
+
+
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <NDKHelper.h>
+#endif
+
 void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 {
 	font.seekg( offset );
@@ -30,18 +36,17 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 
 	struct Format4
 	{
-		UINT16 format = 0;
-		UINT16 length = 0;
-		UINT16 language = 0;
-		UINT16 segCountX2 = 0;
-		UINT16 searchRange = 0;
-		UINT16 entrySelector = 0;
-		UINT16 rangeShift = 0;
-		std::vector<UINT16> endCode;
-		UINT16 reservedPad = 0;
-		std::vector<UINT16> startCode;
-		std::vector<INT16> idDelta;
-		std::vector<UINT16> idRangeOffset;
+		UINT32 format = 0;
+		UINT32 length = 0;
+		UINT32 language = 0;
+		UINT32 segCountX2 = 0;
+		UINT32 searchRange = 0;
+		UINT32 entrySelector = 0;
+		UINT32 rangeShift = 0;
+		std::vector<UINT32> endCode;
+		std::vector<UINT32> startCode;
+		std::vector<UINT32> idDelta;
+		std::vector<UINT32> idRangeOffset;
 		UINT64 glyphIdArray = 0;
 	} format4;
 
@@ -64,7 +69,7 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 			{
 				format4.endCode[index] = read<UINT16>();
 			}
-			format4.reservedPad = read<UINT16>();
+			read<UINT16>(); //reserve pad
 
 			format4.startCode.resize( format4.segCountX2 / 2 );
 			for( UINT32 index = 0; index < format4.startCode.size(); ++index )
@@ -75,7 +80,7 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 			format4.idDelta.resize( format4.segCountX2 / 2 );
 			for( UINT32 index = 0; index < format4.idDelta.size(); ++index )
 			{
-				format4.idDelta[index] = read<INT16>();
+				format4.idDelta[index] = read<UINT16>();
 			}
 
 			format4.idRangeOffset.resize( format4.segCountX2 / 2 );
@@ -94,22 +99,29 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 	{
 		UINT32 count = 0;
 		UINT32 lastSegment = 0;
+		const UINT32 segment_count = format4.endCode.size();
 		unicode_map.resize( INVALID_UNICODE, 0 );
 		for( UINT32 unicode = 0; unicode < unicode_map.size(); ++unicode )
 		{
-			for( UINT32 segIndex = lastSegment; segIndex < format4.endCode.size(); ++segIndex )
+			for( UINT32 segIndex = lastSegment; segIndex < segment_count; ++segIndex )
 			{
 				if( format4.startCode[segIndex] <= unicode && unicode <= format4.endCode[segIndex] )
 				{
 					if( format4.idRangeOffset[segIndex] == 0 )
 					{
-						unicode_map[unicode] = ( format4.idDelta[segIndex] + unicode ) % INVALID_UNICODE;
+						unicode_map[unicode] = ( format4.idDelta[segIndex] + unicode ) % 65536;
 					}
 					else
 					{
-						UINT16 glyphArrayIndex = format4.glyphIdArray + sizeof( UINT16 ) * segIndex - format4.segCountX2 + sizeof( UINT16 ) * ( format4.startCode[segIndex] - unicode ) + format4.idRangeOffset[segIndex];
+						//get back from glyphId array to start of idRangeOffset array and then offset to current idRangOffset entry ( - segment count + segment id )
+						//next add id range offset and step back into glyph Id Array and add offset from range start ( delta( start code, unicode )
+						UINT16 glyphArrayIndex = format4.glyphIdArray + sizeof(UINT16)*( unicode - format4.startCode[segIndex] + segIndex - segment_count ) + format4.idRangeOffset[segIndex];
 						font.seekg( glyphArrayIndex );
 						unicode_map[unicode] = read<UINT16>();
+						if( unicode_map[unicode] )
+						{
+							unicode_map[unicode] = ( unicode_map[unicode] + format4.idDelta[segIndex] ) % 65536;
+						}
 					}
 					lastSegment = segIndex;
 					++count;
@@ -120,7 +132,7 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 	}
 }
 
-noxcain::UINT16 noxcain::FontEngine::getNumGlyphs( UINT32 offset )
+noxcain::UINT32 noxcain::FontEngine::getNumGlyphs( UINT32 offset )
 {
 	font.seekg( offset );
 	UINT16 major = read<UINT16>();
@@ -143,16 +155,16 @@ bool noxcain::FontEngine::isLongOffset( UINT32 offset )
 
 	/*
 	Bit 0: Baseline for font at y = 0;
-	Bit 1: Left sidebearing point at x = 0 ( relevant only for TrueType rasterizers ) — see the note below regarding variable fonts;
+	Bit 1: Left sidebearing point at x = 0 ( relevant only for TrueType rasterizers ) ï¿½ see the note below regarding variable fonts;
 	Bit 2: Instructions may depend on point size;
 	Bit 3: Force ppem to integer values for all internal scaler math; may use fractional ppem sizes if this bit is clear;
 	Bit 4: Instructions may alter advance width( the advance widths might not scale linearly );
-	Bit 5: This bit is not used in OpenType, and should not be set in order to ensure compatible behavior on all platforms.If set, it may result in different behavior for vertical layout in some platforms. ( See Apple’s specification for details regarding behavior in Apple platforms. )
-	Bits 6–10: These bits are not used in Opentype and should always be cleared. ( See Apple’s specification for details regarding legacy used in Apple platforms. )
-	Bit 11: Font data is “lossless” as a result of having been subjected to optimizing transformation and/or compression( such as e.g.compression mechanisms defined by ISO / IEC 14496 - 18, MicroType Express, WOFF 2.0 or similar ) where the original font functionality and features are retained but the binary compatibility between input and output font files is not guaranteed.As a result of the applied transform, the DSIG table may also be invalidated.
+	Bit 5: This bit is not used in OpenType, and should not be set in order to ensure compatible behavior on all platforms.If set, it may result in different behavior for vertical layout in some platforms. ( See Appleï¿½s specification for details regarding behavior in Apple platforms. )
+	Bits 6ï¿½10: These bits are not used in Opentype and should always be cleared. ( See Appleï¿½s specification for details regarding legacy used in Apple platforms. )
+	Bit 11: Font data is ï¿½losslessï¿½ as a result of having been subjected to optimizing transformation and/or compression( such as e.g.compression mechanisms defined by ISO / IEC 14496 - 18, MicroType Express, WOFF 2.0 or similar ) where the original font functionality and features are retained but the binary compatibility between input and output font files is not guaranteed.As a result of the applied transform, the DSIG table may also be invalidated.
 	Bit 12: Font converted( produce compatible metrics )
-	Bit 13: Font optimized for ClearType™.Note, fonts that rely on embedded bitmaps( EBDT ) for rendering should not be considered optimized for ClearType, and therefore should keep this bit cleared.
-	Bit 14: Last Resort font.If set, indicates that the glyphs encoded in the 'cmap' subtables are simply generic symbolic representations of code point ranges and don’t truly represent support for those code points.If unset, indicates that the glyphs encoded in the 'cmap' subtables represent proper support for those code points.
+	Bit 13: Font optimized for ClearTypeï¿½.Note, fonts that rely on embedded bitmaps( EBDT ) for rendering should not be considered optimized for ClearType, and therefore should keep this bit cleared.
+	Bit 14: Last Resort font.If set, indicates that the glyphs encoded in the 'cmap' subtables are simply generic symbolic representations of code point ranges and donï¿½t truly represent support for those code points.If unset, indicates that the glyphs encoded in the 'cmap' subtables represent proper support for those code points.
 	Bit 15: Reserved, set to 0
 	*/
 	UINT16 flags = read<UINT16>();
@@ -175,7 +187,7 @@ bool noxcain::FontEngine::isLongOffset( UINT32 offset )
 	Bit 4 : Shadow( if set to 1 )
 	Bit 5 : Condensed( if set to 1 )
 	Bit 6 : Extended( if set to 1 )
-	Bits 7–15 : Reserved( set to 0 )
+	Bits 7ï¿½15 : Reserved( set to 0 )
 	*/
 	UINT16 macStyle = read<UINT16>();
 
@@ -287,6 +299,9 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 			lastEnd = bands[bandIndex].end = lastEnd + bandWidth;
 		}
 		UINT32 maxFloate32;
+
+		// the end of the last band technical doesent matter
+		// when a curtve doesent fit in another band it ends in the last automatically
 		bands.back().end = corners[offsetOffset + 2] + bandWidth;
 
 		for( UINT32 offset : curveStartOffsets )
@@ -335,8 +350,8 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 				UINT32 off1 = offset1 + 1 - offsetOffset;
 				UINT32 off2 = offset2 + 1 - offsetOffset;
 				return
-					std::max( curvePoints[off1], std::max( curvePoints[std::size_t( off1 ) + 2], curvePoints[std::size_t( off1 ) + 4] ) ) >
-					std::max( curvePoints[off2], std::max( curvePoints[std::size_t( off2 )+ 2], curvePoints[std::size_t( off2 ) + 4] ) );
+					std::max<FLOAT32>( curvePoints[off1], std::max<FLOAT32>( curvePoints[std::size_t( off1 ) + 2], curvePoints[std::size_t( off1 ) + 4] ) ) >
+					std::max<FLOAT32>( curvePoints[off2], std::max<FLOAT32>( curvePoints[std::size_t( off2 )+ 2], curvePoints[std::size_t( off2 ) + 4] ) );
 			} );
 		}
 		
@@ -562,7 +577,7 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 		std::vector<Band> yBands( 32 );
 		std::array<UINT32, 2> yBandCounts = fillBand( curvePoints, curveStartOffsets, yBands, 1, &glyphCorners[std::size_t( 4 ) * rawGlyphIndex] );
 
-		const UINT32 bandCount = std::max( xBandCounts[0], yBandCounts[0] );
+		const UINT32 bandCount = std::max<UINT32>( xBandCounts[0], yBandCounts[0] );
 		const UINT32 curveCount = xBandCounts[1] + yBandCounts[1];
 
 		std::vector<UINT32>& currOffsetMap = offsetMaps[rawGlyphIndex];
@@ -580,9 +595,13 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 		{
 			if( !xBands[bandIndex].curveOffsets.empty() )
 			{
+				//at the start of the point maps are the band ends 
+				//frist x then y 
 				currPointMap[2 * std::size_t( currentBandIndex )] = xBands[bandIndex].end;
+				//the offset map begins with the curve count in the band and the offset to the curve offsets
 				currOffsetMap[4 * std::size_t( currentBandIndex )] = xBands[bandIndex].curveOffsets.size();
 				currOffsetMap[4 * std::size_t( currentBandIndex ) + 1] = currentBandOffset;
+				
 				for( UINT32 offset : xBands[bandIndex].curveOffsets )
 				{
 					currOffsetMap[currentBandOffset++] = offset + 2 * bandCount;
@@ -783,7 +802,8 @@ noxcain::DOUBLE noxcain::FontEngine::readF2Dot14()
 
 bool noxcain::FontEngine::readFont( const std::string& fontPath )
 {
-	font.open( fontPath, std::fstream::binary | std::fstream::in );
+
+	font.open( fontPath.c_str() );
 	if( font.is_open() )
 	{
 		UINT32 endianCheck = 1;
@@ -845,7 +865,7 @@ bool noxcain::FontEngine::readFont( const std::string& fontPath )
 			}
 		};
 
-		const UINT16 nGlyphs = getNumGlyphs( maxp.offset );
+		const UINT32 nGlyphs = getNumGlyphs( maxp.offset );
 		const bool longOffset = isLongOffset( head.offset );
 		
 		//advanceHeights.resize( nGlyphs );
@@ -854,7 +874,7 @@ bool noxcain::FontEngine::readFont( const std::string& fontPath )
 		//topBearings.resize( nGlyphs );
 		leftBearings.resize( nGlyphs );
 
-		glyphIndices.resize( nGlyphs, 0xFFFF );
+		glyphIndices.resize( nGlyphs, INVALID_UNICODE );
 
 		createHorizontalMetrics( hhea.offset, hmtx.offset );
 		if( vhea.length > 0 )
@@ -878,8 +898,7 @@ bool noxcain::FontEngine::readFont( const std::string& fontPath )
 		{
 			return true;
 		}
+		font.close();
 	}
 	return false;
 }
-
-

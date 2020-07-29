@@ -1,9 +1,9 @@
 #include "GameLogicEngine.hpp"
 
 #include <resources/GameResourceEngine.hpp>
-//#include "GameGraphicEngine.h"
 
 #include <logic/GameLogicEngine.hpp>
+#include <logic/Level.hpp>
 #include <logic/DebugLevel.hpp>
 #include <logic/Quad2D.hpp>
 #include <logic/VectorText2D.hpp>
@@ -110,17 +110,7 @@ void noxcain::LogicEngine::finish_game()
 {
 }
 
-const noxcain::LogicEngine::RenderableContainer<noxcain::VectorText2D>& noxcain::LogicEngine::get_vector_labels()
-{
-	std::unique_lock lock( engine->status_mutex );
-	engine->status_condition.wait( lock, []()->bool
-	{
-		return engine->status == Status::DORMANT || engine->status == Status::EXIT;
-	} );
-	return engine->debug_level->on() ? engine->debug_level->get_vector_labels() : engine->current_level->get_vector_labels();
-}
-
-const noxcain::LogicEngine::RenderableContainer<noxcain::GeometryObject>& noxcain::LogicEngine::get_geometry_objects()
+const noxcain::GameLevel::RenderableContainer<noxcain::GeometryObject>& noxcain::LogicEngine::get_geometry_objects()
 {
 	std::unique_lock lock( engine->status_mutex );
 	engine->status_condition.wait( lock, []()->bool
@@ -130,7 +120,17 @@ const noxcain::LogicEngine::RenderableContainer<noxcain::GeometryObject>& noxcai
 	return engine->current_level->get_geometry_objects();
 }
 
-const noxcain::LogicEngine::RenderableContainer<noxcain::VectorText3D>& noxcain::LogicEngine::get_vector_decals()
+const noxcain::GameLevel::UserInterfaceContainer& noxcain::LogicEngine::get_user_interfaces()
+{
+	std::unique_lock lock( engine->status_mutex );
+	engine->status_condition.wait( lock, []()->bool
+	{
+			return engine->status == Status::DORMANT || engine->status == Status::EXIT;
+	} );
+	return engine->debug_level->on() ? engine->debug_level->get_user_interfaces() : engine->current_level->get_user_interfaces();
+}
+
+const noxcain::GameLevel::RenderableContainer<noxcain::VectorText3D>& noxcain::LogicEngine::get_vector_decals()
 {
 	std::unique_lock lock( engine->status_mutex );
 	engine->status_condition.wait( lock, []()->bool
@@ -140,23 +140,8 @@ const noxcain::LogicEngine::RenderableContainer<noxcain::VectorText3D>& noxcain:
 	return engine->current_level->get_vector_decals();
 }
 
-const noxcain::LogicEngine::RenderableContainer<noxcain::RenderableQuad2D>& noxcain::LogicEngine::get_color_labels()
-{
-	std::unique_lock lock( engine->status_mutex );
-	engine->status_condition.wait( lock, []()->bool
-	{
-		return engine->status == Status::DORMANT || engine->status == Status::EXIT;
-	} );
-	return engine->debug_level->on() ? engine->debug_level->get_color_labels() : engine->current_level->get_color_labels();
-}
-
 void noxcain::LogicEngine::set_event( InputEventTypes type, INT32 param1, INT32 param2, UINT32 param3 )
 {
-	static auto correct_y = []( INT32 incorrect_y )
-	{
-		return engine->current_level->get_ui_height() - 1 - incorrect_y;
-	};
-	
 	std::lock_guard<std::mutex> lock( engine->event_mutex );
 	switch( type )
 	{
@@ -172,19 +157,22 @@ void noxcain::LogicEngine::set_event( InputEventTypes type, INT32 param1, INT32 
 		}
 		case InputEventTypes::REGION_KEY_DOWN:
 		{
-			engine->new_region_key_events.emplace_back( static_cast<RegionalKeyEvent::KeyCodes>( param3 ), RegionalKeyEvent::Events::DOWN, param1, correct_y( param2 ) );
+			engine->new_region_key_events.emplace_back( static_cast<RegionalKeyEvent::KeyCodes>( param3 ), RegionalKeyEvent::Events::DOWN, param1, param2 );
 			break;
 		}
 		case InputEventTypes::REGION_KEY_UP:
 		{
-			engine->new_region_key_events.emplace_back( static_cast<RegionalKeyEvent::KeyCodes>( param3 ), RegionalKeyEvent::Events::UP, param1, correct_y( param2 ) );
+			engine->new_region_key_events.emplace_back( static_cast<RegionalKeyEvent::KeyCodes>( param3 ), RegionalKeyEvent::Events::UP, param1, param2 );
 			break;
 		}
 		case InputEventTypes::REGION_MOVE:
 		{
-			engine->cursor_position.x = param1;
-			engine->cursor_position.y = correct_y( param2 );
-			break;
+			if( engine->current_level )
+			{
+				engine->cursor_position.x = param1;
+				engine->cursor_position.y = param2;
+				break;
+			}
 		}
 	};
 }

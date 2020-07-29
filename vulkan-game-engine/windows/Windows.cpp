@@ -7,10 +7,18 @@
 
 LRESULT CALLBACK noxcain::Window::process_message( _In_ HWND hWnd, _In_ UINT uMsg, _In_ WPARAM wParam, _In_ LPARAM lParam )
 {
+	INT32 height = 0;
+	RECT rectangle = { 0 };
+	if( GetClientRect( hWnd, &rectangle ) )
+	{
+		height = max( 0, rectangle.bottom - rectangle.top - 1 );
+	}
+
 	switch( uMsg )
 	{
 		case WM_KEYDOWN:
 		{
+			/*
 			if( wParam == 0x57 )
 			{
 				RECT rect;
@@ -27,7 +35,7 @@ LRESULT CALLBACK noxcain::Window::process_message( _In_ HWND hWnd, _In_ UINT uMs
 			{
 				LogicEngine::resume();
 			}
-			
+			*/
 			LogicEngine::set_event( InputEventTypes::KEY_DOWN, 0, 0, UINT32( wParam ) );
 			break;
 		}
@@ -39,23 +47,23 @@ LRESULT CALLBACK noxcain::Window::process_message( _In_ HWND hWnd, _In_ UINT uMs
 		case WM_LBUTTONDOWN:
 		case WM_LBUTTONDBLCLK:
 		{
-			LogicEngine::set_event( InputEventTypes::REGION_KEY_DOWN, INT16( lParam ), INT16( lParam >> 16 ), 0x01 );
+			LogicEngine::set_event( InputEventTypes::REGION_KEY_DOWN, INT16( lParam ), height - INT16( lParam >> 16 ), 0x01 );
 			break;
 		}
 		case WM_XBUTTONDOWN:
 		case WM_XBUTTONDBLCLK:
 		{
-			LogicEngine::set_event( InputEventTypes::REGION_KEY_DOWN, INT16( lParam ), INT16( lParam >> 16 ), 0x01 );
+			LogicEngine::set_event( InputEventTypes::REGION_KEY_DOWN, INT16( lParam ), height - INT16( lParam >> 16 ), 0x01 );
 			break;
 		}
 		case WM_LBUTTONUP:
 		{
-			LogicEngine::set_event( InputEventTypes::REGION_KEY_UP, INT16( lParam ), INT16( lParam >> 16 ), 0x01 );
+			LogicEngine::set_event( InputEventTypes::REGION_KEY_UP, INT16( lParam ), height - INT16( lParam >> 16 ), 0x01 );
 			break;
 		}
 		case WM_MOUSEMOVE:
 		{
-			LogicEngine::set_event( InputEventTypes::REGION_MOVE, INT16( lParam ), INT16( lParam >> 16 ), 0x00 );
+			LogicEngine::set_event( InputEventTypes::REGION_MOVE, INT16( lParam ), height - INT16( lParam >> 16 ), 0x00 );
 			break;
 		}
 		default:
@@ -113,30 +121,54 @@ noxcain::Window::Window( std::shared_ptr<WindowClass> window_class ) : window_cl
 {
 }
 
+RECT noxcain::Window::get_display_configs()
+{
+	std::vector<MONITOR> monitors;
+	RECT final_rectangle = { 0 };
+
+	while( EnumDisplayMonitors( NULL, NULL, display_callback, reinterpret_cast<LPARAM>( &monitors ) ) );
+	
+	for( const auto& current_monitor : monitors )
+	{
+		if( current_monitor.rectangle.left == 0 && current_monitor.rectangle.top == 0 )
+		{
+			final_rectangle = current_monitor.rectangle;
+			break;
+		}
+	}
+	return final_rectangle;
+}
+
+BOOL noxcain::Window::display_callback( HMONITOR monitor, HDC device_context, LPRECT rectangle, LPARAM app_parameter )
+{
+	auto list = reinterpret_cast<std::vector<MONITOR>*>( app_parameter );
+	if( list->size() && list->front().handle == monitor )
+	{
+		return false;
+	}
+
+	MONITOR current_monitor;
+	current_monitor.handle = monitor;
+	current_monitor.rectangle = *rectangle;
+	list->emplace_back( current_monitor );
+	return true;
+}
+
 void noxcain::Window::draw()
 {
-	constexpr INT32 SCREEN_WIDTH = 1920U;
-	constexpr INT32 SCREEN_HEIGHT = 1080U;
-
 	if( window_class )
 	{
 		//TODO get config start parameters
 
-		HWND w_handle = CreateWindowEx( NULL, window_class->get_class_id(), NULL, WS_POPUP | WS_VISIBLE, -SCREEN_WIDTH, 0, SCREEN_WIDTH, SCREEN_HEIGHT, NULL, NULL, window_class->get_modul(), reinterpret_cast<void*>( this ) );
+		RECT window_rectangle = get_display_configs();
 
+		HWND w_handle = CreateWindowEx( NULL, window_class->get_class_id(), NULL, WS_POPUP, 
+										window_rectangle.left, window_rectangle.top, window_rectangle.right - window_rectangle.left, window_rectangle.bottom - window_rectangle.top,
+										NULL, NULL, window_class->get_modul(), reinterpret_cast<void*>( this ) );
 		if( w_handle )
 		{
-			RAWINPUTDEVICE device =
-			{
-				1, //usUsagePage
-				2, //usUsage
-				0, //flags
-				w_handle //hwndTarget = 
-			};
-
-			bool sc = RegisterRawInputDevices( &device, 1, sizeof( RAWINPUTDEVICE ) );
-
 			window_handle = w_handle;
+			ShowWindow( w_handle, SW_SHOW );
 
 			if( !noxcain::GraphicEngine::run( shared_from_this() ) )
 			{
@@ -186,9 +218,30 @@ LRESULT CALLBACK noxcain::WindowClass::windowProc_( _In_ HWND hWnd, _In_ UINT uM
 			{
 				return window->process_message( hWnd, uMsg, wParam, lParam );
 			}
-			else if( uMsg == WM_DESTROY )
+
+			switch( uMsg )
 			{
-				PostQuitMessage( 0 );
+				case WM_DESTROY:
+				{
+					PostQuitMessage( 0 );
+					break;
+				}
+				case WM_ACTIVATE:
+				{
+					if( wParam == WA_INACTIVE )
+					{
+						ShowWindow( window->window_handle, SW_MINIMIZE );
+					}
+					else
+					{
+						ShowWindow( window->window_handle, SW_RESTORE );
+					}
+					break;
+				}
+				default:
+				{
+					break;
+				}
 			}
 		}
 	}
@@ -205,7 +258,7 @@ noxcain::WindowClass::WindowClass( HINSTANCE hInstance ) : window_class_properti
 		sizeof( Window* ),     //int       cbWndExtra;
 		hInstance,             //HINSTANCE hInstance;
 		NULL,                  //HICON     hIcon;
-		NULL,                  //HCURSOR   hCursor;
+		LoadCursor( NULL, IDC_ARROW ),                  //HCURSOR   hCursor;
 		NULL,//HBRUSH( COLOR_WINDOW ),                  //HBRUSH    hbrBackground;
 		NULL,                  //LPCTSTR   lpszMenuName;
 		CLASS_NAME.c_str(),    //LPCTSTR   lpszClassName;
@@ -231,3 +284,35 @@ LPCSTR noxcain::WindowClass::get_class_id() const
 }
 
 const std::string noxcain::WindowClass::CLASS_NAME( "nxVulkanDefaultWindowClass" );
+
+void noxcain::WindowsFile::close()
+{
+	file.close();
+}
+
+void noxcain::WindowsFile::open( const char* path )
+{
+	file.open( std::string("Assets/") + path, std::ios::binary );
+}
+
+bool noxcain::WindowsFile::is_open() const
+{
+	return file.is_open();
+}
+
+noxcain::NxFile& noxcain::WindowsFile::seekg( UINT32 offset )
+{
+	file.seekg( offset );
+	return *this;
+}
+
+UINT32 noxcain::WindowsFile::tellg()
+{
+	return file.tellg();
+}
+
+noxcain::NxFile& noxcain::WindowsFile::read( char* buffer, std::size_t count )
+{
+	file.read( buffer, count );
+	return *this;
+}

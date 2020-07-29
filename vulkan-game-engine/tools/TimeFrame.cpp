@@ -1,5 +1,9 @@
 #include <tools/TimeFrame.hpp>
 
+noxcain::TimeFrameCollector::TimeFrameCollector()
+{
+}
+
 noxcain::TimeFrameCollector::TimeFrameCollector( std::string name ) : id( TimeFrameCollector::block_id( name ) )
 {
 	
@@ -10,9 +14,17 @@ noxcain::TimeFrameCollector::TimeFrameCollector( std::size_t blocked_id ) : id( 
 
 }
 
+void noxcain::TimeFrameCollector::name_collection( std::string name )
+{
+	if( !id )
+	{
+		id = TimeFrameCollector::block_id( name );
+	}
+}
+
 void noxcain::TimeFrameCollector::start_frame( DOUBLE red, DOUBLE green, DOUBLE blue, DOUBLE alpha, const std::string& description )
 {
-	if( is_activ )
+	if( id && is_activ )
 	{
 		current_time_frame.start_frame = std::chrono::steady_clock::now();
 		current_time_frame.color = { red, green, blue, alpha };
@@ -22,12 +34,12 @@ void noxcain::TimeFrameCollector::start_frame( DOUBLE red, DOUBLE green, DOUBLE 
 
 void noxcain::TimeFrameCollector::end_frame()
 {
-	if( is_activ && current_time_frame.start_frame.time_since_epoch().count() )
+	if( id && is_activ && current_time_frame.start_frame.time_since_epoch().count() )
 	{
 		current_time_frame.end = std::chrono::steady_clock::now();
 		if( frame_mutex.try_lock() )
 		{
-			collections[id]->add( current_time_frame );
+			collections[id-1]->add( current_time_frame );
 			frame_mutex.unlock();
 		}
 		current_time_frame.start_frame = std::chrono::steady_clock::time_point();
@@ -36,14 +48,14 @@ void noxcain::TimeFrameCollector::end_frame()
 
 void noxcain::TimeFrameCollector::end_is_start( DOUBLE red, DOUBLE green, DOUBLE blue, DOUBLE alpha, const std::string& description )
 {
-	if( is_activ )
+	if( id && is_activ )
 	{
 		current_time_frame.end = std::chrono::steady_clock::now();
 		if( current_time_frame.start_frame.time_since_epoch().count() )
 		{
 			if( frame_mutex.try_lock() )
 			{
-				collections[id]->add( current_time_frame );
+				collections[id-1]->add( current_time_frame );
 				frame_mutex.unlock();
 			}
 		}
@@ -55,9 +67,9 @@ void noxcain::TimeFrameCollector::end_is_start( DOUBLE red, DOUBLE green, DOUBLE
 
 void noxcain::TimeFrameCollector::add_time_frame( const debugTimePoint& start_frame, const debugTimePoint& end, DOUBLE red, DOUBLE green, DOUBLE blue, DOUBLE alpha, const std::string& description )
 {
-	if( is_activ && frame_mutex.try_lock() )
+	if( id && is_activ && frame_mutex.try_lock() )
 	{
-		collections[id]->add( TimeFrameData( 
+		collections[id-1]->add( TimeFrameData( 
 			{
 				description,
 				{red,green,blue,alpha},
@@ -72,7 +84,7 @@ std::size_t noxcain::TimeFrameCollector::block_id( const std::string& descriptio
 {
 	std::unique_lock lock( frame_mutex );
 	collections.emplace_back( new TimeFrameCollection( description ) );
-	return collections.size() - 1;
+	return collections.size();
 }
 
 const std::vector<std::unique_ptr<noxcain::TimeFrameCollection>>& noxcain::TimeFrameCollector::get_time_frames()

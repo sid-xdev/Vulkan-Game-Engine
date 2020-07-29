@@ -25,6 +25,6 @@ const vec2 directions[4] =
 
 void main() 
 {
-	uv = 0.5F/push.pixelPerEm * directions[gl_VertexIndex%4] + position;
-	gl_Position = vec4( ( push.pixelPerEm * mat2( push.cosA, push.sinA, -push.sinA, push.cosA )*uv + vec2( push.x, push.y ) )*vec2( width, -height ) + vec2( -1.0, 1.0 ), 0.0F, 1.0F ); //
+	uv = 0.5F * directions[gl_VertexIndex%4] / push.pixelPerEm + position;
+	gl_Position = vec4( ( push.pixelPerEm * mat2( push.cosA, push.sinA, -push.sinA, push.cosA )*uv + vec2( push.x, push.y ) )*vec2( width, height ) + vec2( -1.0, 1.0 ), 0.0F, 1.0F ); //
 }

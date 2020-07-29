@@ -1,8 +1,10 @@
 #include "Label.hpp"
+
+#include <resources/FontResource.hpp>
 #include <cmath>
 
-noxcain::VectorTextLabel2D::VectorTextLabel2D( RenderableList<VectorText2D>& text_list, RenderableList<RenderableQuad2D>& label_list ) :
-	text_content( text_list ), background( label_list ), frame( label_list )
+noxcain::VectorTextLabel2D::VectorTextLabel2D( GameUserInterface& ui ) :
+	text_content( ui.texts ), background( ui.labels ), frame( ui.labels )
 {
 	std::function<DOUBLE()> size_getter = [this]() ->DOUBLE
 	{
@@ -12,12 +14,14 @@ noxcain::VectorTextLabel2D::VectorTextLabel2D( RenderableList<VectorText2D>& tex
 	
 	set_text_alignment( VerticalTextAlignments::BOTTOM );
 	set_text_alignment( HorizontalTextAlignments::LEFT );
+	set_auto_resize( AutoResizeModes::FULL );
 }
 
 void noxcain::VectorTextLabel2D::set_depth_level( UINT32 level )
 {
 	frame.set_depth_level( level );
 	background.set_depth_level( level + 1 );
+	text_content.set_depth_level( level + 1 );
 }
 
 void noxcain::VectorTextLabel2D::set_auto_resize( AutoResizeModes mode )
@@ -158,6 +162,41 @@ void noxcain::VectorTextLabel2D::set_background_color( DOUBLE red, DOUBLE green,
 	}
 }
 
+void noxcain::VectorTextLabel2D::set_centered_icon( DOUBLE size, UINT32 unicode )
+{
+	text_content.get_text().set_size( size );
+	text_content.get_text().set_unicodes( { unicode } );
+	text_content.get_text().set_text_alignment( VectorText::Alignments::LEFT );
+
+	std::function get_x_offset = [this]()
+	{
+		const auto unicodes = get_text_element().get_unicodes();
+		if( unicodes.size() )
+		{
+			const DOUBLE font_size = get_text_element().get_size();
+			const BoundingBox icon_bounding_box = get_text_element().get_font().getCharBoundingBox( unicodes.front() );
+			return -font_size*icon_bounding_box.get_left() + 0.5*( background.get_width() - font_size*icon_bounding_box.get_width() );
+		}
+		return 0.0;
+	};
+	text_content.set_left_anchor( background, get_x_offset );
+
+	std::function get_y_offset = [this]()
+	{
+		const auto unicodes = get_text_element().get_unicodes();
+		if( unicodes.size() )
+		{
+			const DOUBLE font_size = get_text_element().get_size();
+			const auto& font = get_text_element().get_font();
+			const BoundingBox icon_bounding_box = font.getCharBoundingBox( unicodes.front() );
+			
+			return -font_size*( icon_bounding_box.get_bottom() - font.getDescender() ) + 0.5*( background.get_height() - font_size*icon_bounding_box.get_height() );
+		}
+		return 0.0;
+	};
+	text_content.set_bottom_anchor( background, get_y_offset );
+}
+
 void noxcain::VectorTextLabel2D::hide()
 {
 	background.hide();
@@ -169,7 +208,7 @@ void noxcain::VectorTextLabel2D::hide()
 void noxcain::VectorTextLabel2D::show()
 {
 	if( background.get_color()[3] ) background.show();
-	if( frame.get_color()[3] ) frame.show();
+	if( frame_size && frame.get_color()[3] ) frame.show();
 	if( text_content.get_text().get_color()[3] ) text_content.show();
 	is_hidden = false;
 }

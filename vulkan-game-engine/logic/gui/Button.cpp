@@ -89,6 +89,12 @@ bool noxcain::BaseButton::miss( const RegionalKeyEvent& key_event )
 	return true;
 }
 
-noxcain::BaseButton::BaseButton( RenderableList<VectorText2D>& text_list, RenderableList<RenderableQuad2D>& label_list ) : VectorTextLabel2D( text_list, label_list )
+noxcain::BaseButton::BaseButton( GameUserInterface& ui ) : VectorTextLabel2D( ui )
 {
+	set_frame_size( 1 );
+	set_frame_color( 0.6, 0.6, 0.6 );
+	set_background_color( 0.9, 0.9, 0.9 );
+	set_active_color( 0.6, 0.6, 0.6 );
+	set_highlight_color( 1.0, 1.0, 1.0 );
+	get_text_element().set_color( 0.2, 0.2, 0.2 );
 }

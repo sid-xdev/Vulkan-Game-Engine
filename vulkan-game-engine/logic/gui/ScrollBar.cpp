@@ -3,52 +3,6 @@
 #include <algorithm>
 #include <cmath>
 
-noxcain::HorizontalScrollBar::HorizontalScrollBar( DOUBLE frame_size, RenderableList<RenderableQuad2D>& label_list, RenderableList<VectorText2D>& text_list, RegionalEventExclusivTracer& tracer ) : 
-	ScrollBarBase( frame_size, label_list, text_list, tracer )
-{
-	scale_button_left_top.get_area().set_bottom_anchor( slider_region );
-	scale_button_right_bottom.get_area().set_top_anchor( slider_region );
-
-	auto width_getter = [this]()
-	{
-		return scale_button_left_top.get_area().get_height();
-	};
-	scale_button_left_top.get_area().set_width( width_getter );
-	scale_button_right_bottom.get_area().set_width( width_getter );
-
-	slider_region.set_top_anchor( bar, -bar_endcap_size );
-	slider_region.set_bottom_anchor( bar, bar_endcap_size );
-}
-
-void noxcain::HorizontalScrollBar::make_scalable( DOUBLE relative_min_slider_size )
-{
-	ScrollBarBase::make_scalable( relative_min_slider_size );
-
-	DOUBLE distance = fmax( 1.0, bar_endcap_size );
-
-	slider.get_area().set_horizontal_anchor( HorizontalAnchorType::LEFT, scale_button_left_top, HorizontalAnchorType::RIGHT, distance );
-	slider.get_area().set_horizontal_anchor( HorizontalAnchorType::RIGHT, scale_button_right_bottom, HorizontalAnchorType::LEFT, -distance );
-}
-
-noxcain::HorizontalScrollBar::~HorizontalScrollBar()
-{
-}
-
-noxcain::DOUBLE noxcain::HorizontalScrollBar::get_total_slider_length() const
-{
-	return slider_region.get_width();
-}
-
-noxcain::DOUBLE noxcain::HorizontalScrollBar::get_active_bar_length() const
-{
-	return bar.get_width() - 2*bar_endcap_size;
-}
-
-noxcain::DOUBLE noxcain::HorizontalScrollBar::get_event_value( const RegionalKeyEvent& event ) const
-{
-	return event.get_x_position();
-}
-
 noxcain::DOUBLE noxcain::ScrollBarBase::get_slider_working_area_length() const
 {
 	return get_active_bar_length() - get_total_slider_length();
@@ -199,8 +153,8 @@ void noxcain::ScrollBarBase::fix_scale()
 	slider.get_area().set_same_region( slider_region );
 }
 
-noxcain::ScrollBarBase::ScrollBarBase( DOUBLE frame_size, RenderableList<RenderableQuad2D>& label_list, RenderableList<VectorText2D>& text_list, RegionalEventExclusivTracer& tracer ): bar_endcap_size( frame_size ),
-	bar( label_list ), slider( text_list, label_list ), scale_button_left_top( text_list, label_list ), scale_button_right_bottom( text_list, label_list ), drag_tracer( tracer )
+noxcain::ScrollBarBase::ScrollBarBase( DOUBLE frame_size, GameUserInterface& ui, RegionalEventExclusivTracer& tracer ): bar_endcap_size( frame_size ),
+	bar( ui.labels ), slider( ui ), scale_button_left_top( ui ), scale_button_right_bottom( ui ), drag_tracer( tracer )
 {
 	scale_button_left_top.get_area().set_top_anchor( slider_region );
 	scale_button_left_top.get_area().set_left_anchor( slider_region );
@@ -336,8 +290,8 @@ bool noxcain::ScrollBarBase::rescale_slider( DOUBLE direction, const RegionalKey
 	return true;
 }
 
-noxcain::VerticalScrollBar::VerticalScrollBar( DOUBLE frame_size, RenderableList<RenderableQuad2D>& label_list, RenderableList<VectorText2D>& text_list, RegionalEventExclusivTracer& tracer ):
-	ScrollBarBase( frame_size, label_list, text_list, tracer )
+noxcain::VerticalScrollBar::VerticalScrollBar( DOUBLE frame_size, GameUserInterface& ui, RegionalEventExclusivTracer& tracer ):
+	ScrollBarBase( frame_size, ui, tracer )
 {
 	scale_button_left_top.get_area().set_right_anchor( slider_region );
 	scale_button_right_bottom.get_area().set_left_anchor( slider_region );
@@ -376,4 +330,50 @@ noxcain::DOUBLE noxcain::VerticalScrollBar::get_active_bar_length() const
 noxcain::DOUBLE noxcain::VerticalScrollBar::get_event_value( const RegionalKeyEvent& event ) const
 {
 	return event.get_y_position();
+}
+
+noxcain::HorizontalScrollBar::HorizontalScrollBar( DOUBLE frame_size, GameUserInterface& ui, RegionalEventExclusivTracer& tracer ) :
+	ScrollBarBase( frame_size, ui, tracer )
+{
+	scale_button_left_top.get_area().set_bottom_anchor( slider_region );
+	scale_button_right_bottom.get_area().set_top_anchor( slider_region );
+
+	auto width_getter = [this]()
+	{
+		return scale_button_left_top.get_area().get_height();
+	};
+	scale_button_left_top.get_area().set_width( width_getter );
+	scale_button_right_bottom.get_area().set_width( width_getter );
+
+	slider_region.set_top_anchor( bar, -bar_endcap_size );
+	slider_region.set_bottom_anchor( bar, bar_endcap_size );
+}
+
+void noxcain::HorizontalScrollBar::make_scalable( DOUBLE relative_min_slider_size )
+{
+	ScrollBarBase::make_scalable( relative_min_slider_size );
+
+	DOUBLE distance = fmax( 1.0, bar_endcap_size );
+
+	slider.get_area().set_horizontal_anchor( HorizontalAnchorType::LEFT, scale_button_left_top, HorizontalAnchorType::RIGHT, distance );
+	slider.get_area().set_horizontal_anchor( HorizontalAnchorType::RIGHT, scale_button_right_bottom, HorizontalAnchorType::LEFT, -distance );
+}
+
+noxcain::HorizontalScrollBar::~HorizontalScrollBar()
+{
+}
+
+noxcain::DOUBLE noxcain::HorizontalScrollBar::get_total_slider_length() const
+{
+	return slider_region.get_width();
+}
+
+noxcain::DOUBLE noxcain::HorizontalScrollBar::get_active_bar_length() const
+{
+	return bar.get_width() - 2*bar_endcap_size;
+}
+
+noxcain::DOUBLE noxcain::HorizontalScrollBar::get_event_value( const RegionalKeyEvent& event ) const
+{
+	return event.get_x_position();
 }

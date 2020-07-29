@@ -39,6 +39,7 @@ void noxcain::MineSweeperLevel::HexField::set_mine_neighbor_count( UINT8 count )
 {
 	switch( count )
 	{
+		
 		case 0:
 		{
 			mine_count_decal.hide();

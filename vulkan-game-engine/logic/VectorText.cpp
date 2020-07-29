@@ -77,6 +77,12 @@ void noxcain::VectorText::set_utf8( const std::string& utf8String )
 	calculate_offsets();
 }
 
+void noxcain::VectorText::set_unicodes( const std::vector<UINT32>& new_unicodes )
+{
+	unicodes.assign( new_unicodes.begin(), new_unicodes.end() );
+	calculate_offsets();
+}
+
 bool noxcain::VectorText::empty() const
 {
 	return glyphs.empty();

@@ -1,7 +1,13 @@
 #pragma once
 #include <Defines.hpp>
 
-#include <fstream>
+#ifdef WIN32
+#include <windows/Windows.hpp>
+#elif defined(ANDROID) || defined(__ANDROID__)
+#include <android/AndroidSurface.hpp>
+#endif
+
+
 #include <vector>
 
 namespace noxcain
@@ -15,7 +21,7 @@ namespace noxcain
 		FLOAT32 ascender = 0;
 		FLOAT32	descender = 0;
 		FLOAT32 lineGap = 0;
-		
+
 		std::vector<FLOAT32> advanceWidths;
 		std::vector<FLOAT32> leftBearings;
 		//std::vector<FLOAT32> advanceHeights;
@@ -26,13 +32,37 @@ namespace noxcain
 		std::vector<std::vector<FLOAT32>> pointMaps;
 		std::vector<std::vector<UINT32>>  offsetMaps;
 
-		bool isLittleEndian = false;
-		std::fstream font;
+		//DEBUG
+	public:
+		struct Line
+		{
+			FLOAT32 start_x = 0.0;
+			FLOAT32 start_y = 0.0;
 
+			FLOAT32 middle_x = 0.0;
+			FLOAT32 middle_y = 0.0;
+
+			FLOAT32 end_x = 0.0;
+			FLOAT32 end_y = 0.0;
+		};
+		std::vector<Line> lines;
+	
+		const std::vector<Line>& get_lines()
+		{
+			return lines;
+		}
+	private:
+
+		bool isLittleEndian = false;
+#ifdef WIN32
+		WindowsFile font;
+#elif defined(ANDROID) || defined(__ANDROID__)
+		AndroidFile font;
+#endif
 		std::vector<UINT32> unicode_map;
 
 		void createUnicodeMap( UINT32 offset );
-		UINT16 getNumGlyphs( UINT32 offset );
+		UINT32 getNumGlyphs( UINT32 offset );
 		bool isLongOffset( UINT32 offset );
 
 		void createHorizontalMetrics( UINT32 hheaOffset, UINT32 hmtxOffset );

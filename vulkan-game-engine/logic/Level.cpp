@@ -29,7 +29,8 @@ void noxcain::GameLevel::set_status( Status newStatus )
 
 void noxcain::GameLevel::update_key_events( const std::vector<KeyEvent>& key_events )
 {
-	TimeFrame time_frame( time_collector, 0.8, 0.0, 0.0, 0.8, "handle key events" );
+	
+	TimeFrame time_frame( time_collector, 0.8, 0.0, 0.0, 0.8, "key events" );
 	for( auto& key_handler : key_handlers )
 	{
 		key_handler.check_trigger( key_events );
@@ -38,6 +39,8 @@ void noxcain::GameLevel::update_key_events( const std::vector<KeyEvent>& key_eve
 
 void noxcain::GameLevel::update_logic( const std::chrono::nanoseconds& deltaTime, const std::vector<RegionalKeyEvent>& region_key_events )
 {
+	time_collector.start_frame( 0.0, 0.8, 0.8, 0.8, "region input events" );
+
 	const auto& window_resolution = GraphicEngine::get_window_resolution();
 	ui_root->set_size( window_resolution.width, window_resolution.height );
 
@@ -55,12 +58,16 @@ void noxcain::GameLevel::update_logic( const std::chrono::nanoseconds& deltaTime
 	scene_root->update_global_matrices( scene_graph_parent_stack, scene_graph_children_stack );
 
 	time_collector.end_frame();
+
+	for( GameUserInterface& ui : user_interfaces )
+	{
+		ui.sort();
+	}
 }
 
 noxcain::GameLevel::GameLevel() :
 	ui_root( std::make_unique<PassivRecieverNode>() ),
-	scene_root( std::make_unique<SceneGraphNode>() ),
-	time_collector( "Level Logic" )
+	scene_root( std::make_unique<SceneGraphNode>() )
 {
 }
 
@@ -76,18 +83,6 @@ noxcain::NxMatrix4x4 noxcain::GameLevel::get_active_camera() const
 noxcain::GameLevel::Status noxcain::GameLevel::get_level_status() const
 {
 	return status;
-}
-
-const noxcain::GameLevel::RenderableContainer<noxcain::RenderableQuad2D>& noxcain::GameLevel::get_color_labels()
-{
-	for( Renderable<RenderableQuad2D>::List& renderables : color_label_renderables )
-	{
-		renderables.sort( []( const RenderableQuad2D& element_1, const RenderableQuad2D& element_2 )
-		{
-			return element_1.get_depth_level() < element_2.get_depth_level();
-		} );
-	}
-	return color_label_renderables;
 }
 
 noxcain::UINT32 noxcain::GameLevel::get_ui_height() const

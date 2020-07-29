@@ -18,7 +18,7 @@ void noxcain::DebugLevel::initialize()
 	constexpr DOUBLE BLOCK_HEIGHT = LABEL_HEIGHT + LABEL_DISTANCE;
 
 	//tooltip label
-	tooltip = std::make_unique<VectorTextLabel2D>( text_list, label_list );
+	tooltip = std::make_unique<VectorTextLabel2D>( ui );
 	tooltip->set_frame_size( LABEL_FRAME_WIDTH );
 	tooltip->set_frame_color( 0.2, 0.2, 0.2 );
 	tooltip->set_auto_resize( VectorTextLabel2D::AutoResizeModes::WIDTH );
@@ -32,7 +32,7 @@ void noxcain::DebugLevel::initialize()
 	tooltip->set_depth_level( 30 );
 	tooltip->hide();
 
-	background = std::make_unique<PassivColorLabel>( label_list );
+	background = std::make_unique<PassivColorLabel>( ui.labels );
 	background->set_top_anchor( get_screen_root(), -LABEL_DISTANCE );
 	background->set_left_anchor( get_screen_root(), LABEL_DISTANCE );
 	background->set_right_anchor( get_screen_root(), -LABEL_DISTANCE );
@@ -99,7 +99,7 @@ void noxcain::DebugLevel::initialize()
 	scissor_label->set_bottom_anchor( *exit_button );
 
 	//scroll bar
-	scroll_bar = std::make_unique<HorizontalScrollBar>( 1.0, label_list, text_list, get_exclusiv_handler() );
+	scroll_bar = std::make_unique<HorizontalScrollBar>( 1.0, ui, get_exclusiv_handler() );
 	scroll_bar->set_top( *exit_button );
 	scroll_bar->set_bottom( *exit_button );
 	scroll_bar->set_left( *scissor_label );
@@ -188,10 +188,9 @@ void noxcain::DebugLevel::update_level_logic( const std::chrono::nanoseconds& de
 	}
 }
 
-noxcain::DebugLevel::DebugLevel() : exit_button( std::make_unique<BaseButton>( text_list, label_list ) )
+noxcain::DebugLevel::DebugLevel() : exit_button( std::make_unique<BaseButton>( ui ) )
 {
-	vector_label_renderables.emplace_back( text_list );
-	color_label_renderables.emplace_back( label_list );
+	user_interfaces.emplace_back( ui );
 }
 
 noxcain::DebugLevel::~DebugLevel()
@@ -233,7 +232,7 @@ bool noxcain::DebugLevel::on()
 }
 
 noxcain::DebugLevel::TimeFrameLabel::TimeFrameLabel( DebugLevel& level ) : 
-	frame( level.label_list ), background( level.label_list ), text( level.text_list ), tooltip( *level.tooltip )
+	frame( level.ui.labels ), background( level.ui.labels ), text( level.ui.texts ), tooltip( *level.tooltip )
 {
 	background.set_same_region( frame, LABEL_FRAME_WIDTH, LABEL_FRAME_WIDTH );
 
@@ -241,6 +240,7 @@ noxcain::DebugLevel::TimeFrameLabel::TimeFrameLabel( DebugLevel& level ) :
 	
 	frame.set_depth_level( 10 );
 	background.set_depth_level( 20 );
+	text.set_depth_level( 20 );
 }
 
 void noxcain::DebugLevel::TimeFrameLabel::setup_as_group_label( const Region& anchor_parent, DOUBLE x_offset, DOUBLE y_offset, DOUBLE width, DOUBLE height,

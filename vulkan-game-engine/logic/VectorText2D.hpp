@@ -37,8 +37,19 @@ namespace noxcain
 			return scissor;
 		}
 
+		void set_depth_level( UINT32 depth_ )
+		{
+			depth = depth_;
+		}
+
+		UINT32 get_depth_level() const
+		{
+			return depth;
+		}
+
 		vk::Rect2D record( const vk::CommandBuffer& command_buffer, vk::PipelineLayout pipeline_layout, vk::Rect2D current_scissor, vk::Rect2D default_scissor ) const;
 	private:
+		UINT32 depth = 0;
 		VectorText text;
 		const Region* scissor = nullptr;
 	};

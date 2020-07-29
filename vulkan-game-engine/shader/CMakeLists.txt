@@ -1,15 +1,33 @@
+set( NX_GLSL_SHADER_DIR "${CMAKE_SOURCE_DIR}/build-data/shaders" CACHE PATH "GLSL shader files directory" )
+set( NX_GLSL_LANGUAGE_VALIDATOR "$ENV{VULKAN_SDK}/Bin" CACHE PATH "glslangValidator file path" )
 
-#find all shader files
-file( GLOB NX_FRAGMENT_SHADER_FILES LIST_DIRECTORIES false RELATIVE ${NX_GLSL_SHADER_DIR} CONFIGURE_DEPENDS "${NX_GLSL_SHADER_DIR}/*.frag" )
-file( GLOB NX_VERTEX_SHADER_FILES LIST_DIRECTORIES false RELATIVE ${NX_GLSL_SHADER_DIR} CONFIGURE_DEPENDS "${NX_GLSL_SHADER_DIR}/*.vert" )
-file( GLOB NX_COMPUTE_SHADER_FILES LIST_DIRECTORIES false RELATIVE ${NX_GLSL_SHADER_DIR} CONFIGURE_DEPENDS "${NX_GLSL_SHADER_DIR}/*.compute" )
+message( STATUS "${NX_GLSL_LANGUAGE_VALIDATOR}"  )
+message( STATUS "${NX_GLSL_SHADER_DIR}"  )
+
+set( NX_FRAGMENT_SHADER_FILES
+		"deferred_geometry.frag"
+		"edge_detection.frag"
+		"finalize.frag"
+		"glyph_contour_2D.frag"
+		"glyph_contour_3D.frag"
+		"label.frag"
+		"single_shading.frag"
+		"multi_shading.frag"
+		"normal.frag" )
+		
+set( NX_VERTEX_SHADER_FILES
+		"deferred_geometry.vert"
+		"glyph_quad_2D.vert"
+		"glyph_quad_3D.vert"
+		"label.vert"
+		"full_screen.vert"
+		"normal.vert" )
+		
+set( NX_COMPUTE_SHADER_FILES )
 
 list(LENGTH NX_VERTEX_SHADER_FILES NX_VERTEX_SHADER_COUNT )
 list(LENGTH NX_FRAGMENT_SHADER_FILES NX_FRAGMENT_SHADER_COUNT )
 list(LENGTH NX_COMPUTE_SHADER_FILES NX_COMPUTE_SHADER_COUNT )
-
-set( NX_GLSL_SHADER_DIR "${CMAKE_SOURCE_DIR}/build-data/shaders" CACHE PATH "GLSL shader files directory" )
-set( NX_GLSL_LANGUAGE_VALIDATOR "$ENV{VULKAN_SDK}/Bin" CACHE PATH "glslangValidator file path" )
 
 if( NOT EXISTS ${NX_GLSL_LANGUAGE_VALIDATOR} )
 	message( STATUS "Compile time resources are missing!" )
