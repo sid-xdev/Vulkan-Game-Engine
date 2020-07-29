@@ -170,5 +170,5 @@ void main()
 			}
 		}
 	}
-	color = vec4( push.r, push.g, push.b, push.a * coverage / ( 2.0F*stepCount ) );
+	color = vec4( push.r, push.g, push.b, push.a * abs( coverage ) / ( 2.0F*stepCount ) );
 }

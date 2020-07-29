@@ -199,5 +199,5 @@ void main()
 	
 	outPosition = vec4( 0.0F );
 	outNormal   = vec4( 0.0F );
-	outColor    = vec4( push.r, push.g, push.b, push.a * coverage / ( sampleCount.x + sampleCount.y ) );
+	outColor    = vec4( push.r, push.g, push.b, push.a * abs( coverage ) / ( sampleCount.x + sampleCount.y ) );
 }
