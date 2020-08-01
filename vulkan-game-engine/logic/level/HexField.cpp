@@ -14,14 +14,14 @@ void noxcain::MineSweeperLevel::HexField::update_position( UINT32 unicode )
 	const auto& font = ResourceEngine::get_engine().get_font( mine_count_decal.get_font_id() );
 
 	const auto& hexBoundingBox = field_geometry.get_bounding_box();
-	const auto& numBoundingBox = font.getCharBoundingBox( unicode );
+	const auto& numBoundingBox = font.get_character_bounding_box( unicode );
 
 	DOUBLE size = ( 0.6*hexBoundingBox.get_height() ) / numBoundingBox.get_height();
 	
 	mine_count_decal.set_font_size( size );
 	mine_count_decal.set_local_matrix( NxMatrix4x4().translation( {
 		-size *( numBoundingBox.get_left() + 0.5*numBoundingBox.get_width() ),
-		-size *( font.getDescender() + numBoundingBox.get_bottom() + 0.5*numBoundingBox.get_height() ),
+		-size *( font.get_descender() + numBoundingBox.get_bottom() + 0.5*numBoundingBox.get_height() ),
 		0.0 } ) );
 }
 

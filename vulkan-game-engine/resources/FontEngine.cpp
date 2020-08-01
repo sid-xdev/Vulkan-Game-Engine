@@ -1,23 +1,18 @@
 #include "FontEngine.hpp"
 
+#include <ResourceFile.hpp>
 #include <fstream>
 #include <vector>
 #include <array>
 #include <algorithm>
 #include <cmath>
 
-
-
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <NDKHelper.h>
-#endif
-
-void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
+void noxcain::FontEngine::createUnicodeMap( ResourceFile& font_file, UINT32 offset )
 {
-	font.seekg( offset );
+	font_file.set_position( offset );
 
-	UINT16 cmapVersion = read<UINT16>();
-	UINT16 nCmapTables = read<UINT16>();
+	UINT16 cmapVersion = font_file.read_fundamental<UINT16>();
+	UINT16 nCmapTables = font_file.read_fundamental<UINT16>();
 
 	struct EncodingRecord
 	{
@@ -29,9 +24,9 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 
 	for( UINT32 encodingIndex = 0; encodingIndex < nCmapTables; ++encodingIndex )
 	{
-		encodingRecords[encodingIndex].platformId = read<UINT16>();
-		encodingRecords[encodingIndex].encodingId = read<UINT16>();
-		encodingRecords[encodingIndex].offset = read<UINT32>();
+		encodingRecords[encodingIndex].platformId = font_file.read_fundamental<UINT16>();
+		encodingRecords[encodingIndex].encodingId = font_file.read_fundamental<UINT16>();
+		encodingRecords[encodingIndex].offset = font_file.read_fundamental<UINT32>();
 	}
 
 	struct Format4
@@ -55,41 +50,41 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 	{
 		if( record.platformId == 3 && record.encodingId == 1 )
 		{
-			font.seekg( std::streamoff( offset ) + record.offset );
-			format4.format = read<UINT16>();
-			format4.length = read<UINT16>();
-			format4.language = read<UINT16>();
-			format4.segCountX2 = read<UINT16>();
-			format4.searchRange = read<UINT16>();
-			format4.entrySelector = read<UINT16>();
-			format4.rangeShift = read<UINT16>();
+			font_file.set_position( UINT64( offset ) + record.offset );
+			format4.format = font_file.read_fundamental<UINT16>();
+			format4.length = font_file.read_fundamental<UINT16>();
+			format4.language = font_file.read_fundamental<UINT16>();
+			format4.segCountX2 = font_file.read_fundamental<UINT16>();
+			format4.searchRange = font_file.read_fundamental<UINT16>();
+			format4.entrySelector = font_file.read_fundamental<UINT16>();
+			format4.rangeShift = font_file.read_fundamental<UINT16>();
 
 			format4.endCode.resize( format4.segCountX2 / 2 );
 			for( UINT32 index = 0; index < format4.endCode.size(); ++index )
 			{
-				format4.endCode[index] = read<UINT16>();
+				format4.endCode[index] = font_file.read_fundamental<UINT16>();
 			}
-			read<UINT16>(); //reserve pad
+			font_file.read_fundamental<UINT16>(); //reserve pad
 
 			format4.startCode.resize( format4.segCountX2 / 2 );
 			for( UINT32 index = 0; index < format4.startCode.size(); ++index )
 			{
-				format4.startCode[index] = read<UINT16>();
+				format4.startCode[index] = font_file.read_fundamental<UINT16>();
 			}
 
 			format4.idDelta.resize( format4.segCountX2 / 2 );
 			for( UINT32 index = 0; index < format4.idDelta.size(); ++index )
 			{
-				format4.idDelta[index] = read<UINT16>();
+				format4.idDelta[index] = font_file.read_fundamental<UINT16>();
 			}
 
 			format4.idRangeOffset.resize( format4.segCountX2 / 2 );
 			for( UINT32 index = 0; index < format4.idRangeOffset.size(); ++index )
 			{
-				format4.idRangeOffset[index] = read<UINT16>();
+				format4.idRangeOffset[index] = font_file.read_fundamental<UINT16>();
 			}
 
-			format4.glyphIdArray = font.tellg();
+			format4.glyphIdArray = font_file.get_position();
 			has_record = true;
 			break;
 		}
@@ -97,61 +92,60 @@ void noxcain::FontEngine::createUnicodeMap( UINT32 offset )
 
 	if( has_record )
 	{
-		UINT32 count = 0;
-		UINT32 lastSegment = 0;
 		const UINT32 segment_count = format4.endCode.size();
-		unicode_map.resize( INVALID_UNICODE, 0 );
-		for( UINT32 unicode = 0; unicode < unicode_map.size(); ++unicode )
+
+		unicode_ranges.reserve( segment_count );
+		for( UINT32 segIndex = 0; segIndex < segment_count; ++segIndex )
 		{
-			for( UINT32 segIndex = lastSegment; segIndex < segment_count; ++segIndex )
+			if( format4.idRangeOffset[segIndex] == 0 )
 			{
-				if( format4.startCode[segIndex] <= unicode && unicode <= format4.endCode[segIndex] )
+				unicode_ranges.emplace_back( format4.startCode[segIndex] );
+				unicode_ranges.emplace_back( format4.endCode[segIndex] );
+				unicode_ranges.emplace_back( ( format4.idDelta[segIndex] + format4.startCode[segIndex] ) % 65536 );
+			}
+			else
+			{
+				std::size_t count = format4.endCode[segIndex] - format4.startCode[segIndex] + 1;
+				for( std::size_t index = 0; index < count; ++index )
 				{
-					if( format4.idRangeOffset[segIndex] == 0 )
+					//get back from glyphId array to start of idRangeOffset array and then offset to current idRangOffset entry ( - segment count + segment id )
+					//next add id range offset and step back into glyph Id Array and add offset from range start ( delta( start code, unicode )
+					UINT16 glyphArrayIndex = format4.glyphIdArray + sizeof( UINT16 )*( index + segIndex - segment_count ) + format4.idRangeOffset[segIndex];
+					font_file.set_position( glyphArrayIndex );
+					UINT32 glyph_index = font_file.read_fundamental<UINT16>();
+					if( glyph_index )
 					{
-						unicode_map[unicode] = ( format4.idDelta[segIndex] + unicode ) % 65536;
+						glyph_index = ( glyph_index + format4.idDelta[segIndex] ) % 65536;
+						unicode_ranges.emplace_back( format4.startCode[segIndex] + index );
+						unicode_ranges.emplace_back( format4.startCode[segIndex] + index );
+						unicode_ranges.emplace_back( glyph_index );
 					}
-					else
-					{
-						//get back from glyphId array to start of idRangeOffset array and then offset to current idRangOffset entry ( - segment count + segment id )
-						//next add id range offset and step back into glyph Id Array and add offset from range start ( delta( start code, unicode )
-						UINT16 glyphArrayIndex = format4.glyphIdArray + sizeof(UINT16)*( unicode - format4.startCode[segIndex] + segIndex - segment_count ) + format4.idRangeOffset[segIndex];
-						font.seekg( glyphArrayIndex );
-						unicode_map[unicode] = read<UINT16>();
-						if( unicode_map[unicode] )
-						{
-							unicode_map[unicode] = ( unicode_map[unicode] + format4.idDelta[segIndex] ) % 65536;
-						}
-					}
-					lastSegment = segIndex;
-					++count;
-					break;
 				}
 			}
 		}
 	}
 }
 
-noxcain::UINT32 noxcain::FontEngine::getNumGlyphs( UINT32 offset )
+noxcain::UINT32 noxcain::FontEngine::getNumGlyphs( ResourceFile& font_file, UINT32 offset )
 {
-	font.seekg( offset );
-	UINT16 major = read<UINT16>();
-	UINT16 minor = read<UINT16>();
-	return read<UINT16>();
+	font_file.set_position( offset );
+	UINT16 major = font_file.read_fundamental<UINT16>();
+	UINT16 minor = font_file.read_fundamental<UINT16>();
+	return font_file.read_fundamental<UINT16>();
 }
 
-bool noxcain::FontEngine::isLongOffset( UINT32 offset )
+bool noxcain::FontEngine::isLongOffset( ResourceFile& font_file, UINT32 offset )
 {
-	font.seekg( offset );
+	font_file.set_position( offset );
 
-	UINT16 majorVersion = read<UINT16>();
-	UINT16 minorVersion = read<UINT16>();
+	UINT16 majorVersion = font_file.read_fundamental<UINT16>();
+	UINT16 minorVersion = font_file.read_fundamental<UINT16>();
 
-	UINT16 majorFontVersion = read<UINT16>();
-	UINT16 minorFontVersion = read<UINT16>();
+	UINT16 majorFontVersion = font_file.read_fundamental<UINT16>();
+	UINT16 minorFontVersion = font_file.read_fundamental<UINT16>();
 
-	UINT32 checkSumAdjustment = read<UINT32>();
-	UINT32 magicNumber = read<UINT32>();
+	UINT32 checkSumAdjustment = font_file.read_fundamental<UINT32>();
+	UINT32 magicNumber = font_file.read_fundamental<UINT32>();
 
 	/*
 	Bit 0: Baseline for font at y = 0;
@@ -167,18 +161,18 @@ bool noxcain::FontEngine::isLongOffset( UINT32 offset )
 	Bit 14: Last Resort font.If set, indicates that the glyphs encoded in the 'cmap' subtables are simply generic symbolic representations of code point ranges and don�t truly represent support for those code points.If unset, indicates that the glyphs encoded in the 'cmap' subtables represent proper support for those code points.
 	Bit 15: Reserved, set to 0
 	*/
-	UINT16 flags = read<UINT16>();
+	UINT16 flags = font_file.read_fundamental<UINT16>();
 	if( ( flags & 0x3 ) != 0x3 )
 	{
 		int stop = 1;
 	}
-	unitsPerEm = read<UINT16>();
-	UINT64 created = read<UINT64>();
-	UINT64 modified = read<UINT64>();
-	INT16 xMin = read<INT16>();
-	INT16 yMin = read<INT16>();
-	INT16 xMax = read<INT16>();
-	INT16 yMax = read<INT16>();
+	units_per_em = font_file.read_fundamental<UINT16>();
+	UINT64 created = font_file.read_fundamental<UINT64>();
+	UINT64 modified = font_file.read_fundamental<UINT64>();
+	INT16 xMin = font_file.read_fundamental<INT16>();
+	INT16 yMin = font_file.read_fundamental<INT16>();
+	INT16 xMax = font_file.read_fundamental<INT16>();
+	INT16 yMax = font_file.read_fundamental<INT16>();
 	/*
 	Bit 0 : Bold( if set to 1 );
 	Bit 1: Italic( if set to 1 )
@@ -189,9 +183,9 @@ bool noxcain::FontEngine::isLongOffset( UINT32 offset )
 	Bit 6 : Extended( if set to 1 )
 	Bits 7�15 : Reserved( set to 0 )
 	*/
-	UINT16 macStyle = read<UINT16>();
+	UINT16 macStyle = font_file.read_fundamental<UINT16>();
 
-	UINT16 lowestRecPPEM = read<UINT16>();
+	UINT16 lowestRecPPEM = font_file.read_fundamental<UINT16>();
 
 	/*
 	0 : Fully mixed directional glyphs;
@@ -200,55 +194,55 @@ bool noxcain::FontEngine::isLongOffset( UINT32 offset )
 	-1: Only strongly right to left;
 	-2: Like - 1 but also contains neutrals.
 	*/
-	INT16 fontDirectionHint = read<INT16>();
-	INT16 indexToLocFormat = read<INT16>();
-	INT16 glyphDataFormat = read<INT16>();
+	INT16 fontDirectionHint = font_file.read_fundamental<INT16>();
+	INT16 indexToLocFormat = font_file.read_fundamental<INT16>();
+	INT16 glyphDataFormat = font_file.read_fundamental<INT16>();
 	return indexToLocFormat;
 }
 
-void noxcain::FontEngine::createHorizontalMetrics( UINT32 hheaOffset, UINT32 hmtxOffset )
+void noxcain::FontEngine::createHorizontalMetrics( ResourceFile& font_file, UINT32 hheaOffset, UINT32 hmtxOffset )
 {
-	font.seekg( hheaOffset );
+	font_file.set_position( hheaOffset );
 
-	UINT16 	majorVersion = read<UINT16>();
-	UINT16 	minorVersion = read<UINT16>();
-	ascender = FLOAT32( read<INT16>() ) / unitsPerEm;
-	descender = FLOAT32( read<INT16>() ) / unitsPerEm;
-	lineGap = FLOAT32( read<INT16>() ) / unitsPerEm;
-	UINT16 	advanceWidthMax = read<UINT16>();
-	INT16 	minLeftSideBearing = read<INT16>();
-	INT16 	minRightSideBearing = read<INT16>();
-	INT16 	xMaxExtent = read<INT16>() / unitsPerEm;
-	INT16 	caretSlopeRise = read<INT16>();
-	INT16 	caretSlopeRun = read<INT16>();
-	INT16 	caretOffset = read<INT16>();
+	UINT16 	majorVersion = font_file.read_fundamental<UINT16>();
+	UINT16 	minorVersion = font_file.read_fundamental<UINT16>();
+	ascender = FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em;
+	descender = FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em;
+	line_gap = FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em;
+	UINT16 	advanceWidthMax = font_file.read_fundamental<UINT16>();
+	INT16 	minLeftSideBearing = font_file.read_fundamental<INT16>();
+	INT16 	minRightSideBearing = font_file.read_fundamental<INT16>();
+	INT16 	xMaxExtent = font_file.read_fundamental<INT16>() / units_per_em;
+	INT16 	caretSlopeRise = font_file.read_fundamental<INT16>();
+	INT16 	caretSlopeRun = font_file.read_fundamental<INT16>();
+	INT16 	caretOffset = font_file.read_fundamental<INT16>();
 	INT16 reserved;
-	reserved = read<INT16>();
-	reserved = read<INT16>();
-	reserved = read<INT16>();
-	reserved = read<INT16>();
-	INT16 	metricDataFormat = read<INT16>();
-	UINT16 	numberOfHMetrics = read<UINT16>();
+	reserved = font_file.read_fundamental<INT16>();
+	reserved = font_file.read_fundamental<INT16>();
+	reserved = font_file.read_fundamental<INT16>();
+	reserved = font_file.read_fundamental<INT16>();
+	INT16 	metricDataFormat = font_file.read_fundamental<INT16>();
+	UINT16 	numberOfHMetrics = font_file.read_fundamental<UINT16>();
 
-	font.seekg( hmtxOffset );
+	font_file.set_position( hmtxOffset );
 	for( UINT32 index = 0; index < numberOfHMetrics; ++index )
 	{
-		advanceWidths[index] = FLOAT32( read<INT16>() ) / unitsPerEm;
-		leftBearings[index] = FLOAT32( read<INT16>() ) / unitsPerEm;
+		advance_widths[index] = FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em;
+		left_bearings[index] = FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em;
 	}
 
-	for( UINT32 index = numberOfHMetrics; index < advanceWidths.size(); ++index )
+	for( UINT32 index = numberOfHMetrics; index < advance_widths.size(); ++index )
 	{
-		advanceWidths[index] = advanceWidths[numberOfHMetrics - 1];
-		leftBearings[index] = FLOAT32( read<INT16>() ) / unitsPerEm;
+		advance_widths[index] = advance_widths[numberOfHMetrics - 1];
+		left_bearings[index] = FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em;
 	}
 }
 
-void noxcain::FontEngine::createVerticalMetrics( UINT32 vheaOffset, UINT32 vmtxOffset )
+void noxcain::FontEngine::createVerticalMetrics( ResourceFile& font_file, UINT32 vheaOffset, UINT32 vmtxOffset )
 {
 }
 
-void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UINT32>& glyphOffsets )
+void noxcain::FontEngine::computeGlyph( ResourceFile& font_file, UINT32 tableOffset, const std::vector<UINT32>& glyphOffsets )
 {
 	struct RawSimpleGlyph
 	{
@@ -367,16 +361,16 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 	{
 		if( glyphOffsets[glyph_index] != glyphOffsets[std::size_t( glyph_index ) + 1] )
 		{
-			glyphIndices[glyph_index] = rawGlyphs.size();
+			glyph_indices[glyph_index] = rawGlyphs.size();
 			
-			font.seekg( std::streamoff( tableOffset ) + glyphOffsets[glyph_index] );
+			font_file.set_position( UINT64( tableOffset ) + glyphOffsets[glyph_index] );
 
-			const INT16 numberOfContours = read<INT16>();
+			const INT16 numberOfContours = font_file.read_fundamental<INT16>();
 
-			glyphCorners.push_back( FLOAT32( read<INT16>() ) / unitsPerEm ); // minX
-			glyphCorners.push_back( FLOAT32( read<INT16>() ) / unitsPerEm ); // minY
-			glyphCorners.push_back( FLOAT32( read<INT16>() ) / unitsPerEm ); // maxX
-			glyphCorners.push_back( FLOAT32( read<INT16>() ) / unitsPerEm ); // maxY
+			glyph_corners.push_back( FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em ); // minX
+			glyph_corners.push_back( FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em ); // minY
+			glyph_corners.push_back( FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em ); // maxX
+			glyph_corners.push_back( FLOAT32( font_file.read_fundamental<INT16>() ) / units_per_em ); // maxY
 
 			rawGlyphs.push_back( RawSimpleGlyph() );
 
@@ -384,7 +378,7 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 			if( numberOfContours >= 0 )
 			{
 				rawGlyphs.back().endPointIndices.resize( numberOfContours );
-				readSimpleGlyph( rawGlyphs.back().endPointIndices, rawGlyphs.back().flags, rawGlyphs.back().xCoords, rawGlyphs.back().yCoords );
+				readSimpleGlyph( font_file, rawGlyphs.back().endPointIndices, rawGlyphs.back().flags, rawGlyphs.back().xCoords, rawGlyphs.back().yCoords );
 			}
 			//read as Composite glyph
 			else
@@ -398,58 +392,58 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 					newCompositeGlyph.components.push_back( Component() );
 					Component& newComponent = newCompositeGlyph.components.back();
 
-					newComponent.flags = read<UINT16>();
-					newComponent.index = read<UINT16>();
+					newComponent.flags = font_file.read_fundamental<UINT16>();
+					newComponent.index = font_file.read_fundamental<UINT16>();
 
 					switch( newComponent.flags & 0x3 )
 					{
 						case 0x1:
 						{
-							newComponent.argument1 = read<UINT16>();
-							newComponent.argument2 = read<UINT16>();
+							newComponent.argument1 = font_file.read_fundamental<UINT16>();
+							newComponent.argument2 = font_file.read_fundamental<UINT16>();
 							break;
 						}
 						case 0x2:
 						{
-							newComponent.argument1 = read<INT8>();
-							newComponent.argument2 = read<INT8>();
+							newComponent.argument1 = font_file.read_fundamental<INT8>();
+							newComponent.argument2 = font_file.read_fundamental<INT8>();
 							break;
 						}
 						case 0x3:
 						{
-							newComponent.argument1 = read<INT16>();
-							newComponent.argument2 = read<INT16>();
+							newComponent.argument1 = font_file.read_fundamental<INT16>();
+							newComponent.argument2 = font_file.read_fundamental<INT16>();
 							break;
 						}
 						default:
 						{
-							newComponent.argument1 = read<UINT8>();
-							newComponent.argument2 = read<UINT8>();
+							newComponent.argument1 = font_file.read_fundamental<UINT8>();
+							newComponent.argument2 = font_file.read_fundamental<UINT8>();
 							break;
 						}
 					}
 
 					if( newComponent.flags & 0x0008 )
 					{
-						newComponent.transformation1 = newComponent.transformation4 = readF2Dot14();
+						newComponent.transformation1 = newComponent.transformation4 = font_file.read_f2dot14();
 					}
 					else if( newComponent.flags & 0x0040 )
 					{
-						newComponent.transformation1 = readF2Dot14();
-						newComponent.transformation4 = readF2Dot14();
+						newComponent.transformation1 = font_file.read_f2dot14();
+						newComponent.transformation4 = font_file.read_f2dot14();
 					}
 					else if( newComponent.flags & 0x0080 )
 					{
-						newComponent.transformation1 = readF2Dot14();
-						newComponent.transformation2 = readF2Dot14();
-						newComponent.transformation3 = readF2Dot14();
-						newComponent.transformation4 = readF2Dot14();
+						newComponent.transformation1 = font_file.read_f2dot14();
+						newComponent.transformation2 = font_file.read_f2dot14();
+						newComponent.transformation3 = font_file.read_f2dot14();
+						newComponent.transformation4 = font_file.read_f2dot14();
 					}
 
 					if( newComponent.flags & 0x0200 )
 					{
-						advanceWidths[newCompositeGlyph.glyph_index] = advanceWidths[newComponent.index];
-						leftBearings[newCompositeGlyph.glyph_index] = leftBearings[newComponent.index];
+						advance_widths[newCompositeGlyph.glyph_index] = advance_widths[newComponent.index];
+						left_bearings[newCompositeGlyph.glyph_index] = left_bearings[newComponent.index];
 						//advanceHeights[newCompositeGlyph.glyph_index] = advanceHeights[newComponent.index];
 						//topBearings[newCompositeGlyph.glyph_index] = topBearings[newComponent.index];
 					}
@@ -458,15 +452,15 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 		}
 	}
 
-	glyphCount = rawGlyphs.size();
+	glyph_count = rawGlyphs.size();
 
 	//combine glyph components;
 	for( const CompositeGlyph& compositeGlyph : compositeGlyphs )
 	{
-		RawSimpleGlyph& newGlyph = rawGlyphs[glyphIndices[compositeGlyph.glyph_index]];
+		RawSimpleGlyph& newGlyph = rawGlyphs[glyph_indices[compositeGlyph.glyph_index]];
 		for( const Component& component : compositeGlyph.components )
 		{
-			const RawSimpleGlyph& componentGlyph = rawGlyphs[glyphIndices[component.index]];
+			const RawSimpleGlyph& componentGlyph = rawGlyphs[glyph_indices[component.index]];
 
 			DOUBLE offsetX = 0;
 			DOUBLE offsetY = 0;
@@ -514,8 +508,8 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 		}
 	}
 
-	pointMaps.resize( glyphCount );
-	offsetMaps.resize( glyphCount );
+	point_maps.resize( glyph_count );
+	offset_maps.resize( glyph_count );
 
 	//rebuild glyphs 2 map
 	for( UINT32 rawGlyphIndex = 0; rawGlyphIndex < rawGlyphs.size(); ++rawGlyphIndex )
@@ -537,8 +531,8 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 			{	
 				UINT32 index = relIndex % size;
 				
-				FLOAT32 currPointX = glyph.xCoords[std::size_t(startIndex) + index] / unitsPerEm;
-				FLOAT32 currPointY = glyph.yCoords[std::size_t( startIndex ) + index] / unitsPerEm;
+				FLOAT32 currPointX = glyph.xCoords[std::size_t(startIndex) + index] / units_per_em;
+				FLOAT32 currPointY = glyph.yCoords[std::size_t( startIndex ) + index] / units_per_em;
 
 				if( shouldOnCurve == bool( glyph.flags[std::size_t( startIndex ) + index] & 0x1 ) )
 				{
@@ -547,8 +541,8 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 				else
 				{
 					UINT32 prevIndex = ( index + size - 1 ) % size;
-					DOUBLE prevPointX = glyph.xCoords[std::size_t( startIndex ) + prevIndex] / unitsPerEm;
-					DOUBLE prevPointY = glyph.yCoords[std::size_t( startIndex ) + prevIndex] / unitsPerEm;
+					DOUBLE prevPointX = glyph.xCoords[std::size_t( startIndex ) + prevIndex] / units_per_em;
+					DOUBLE prevPointY = glyph.yCoords[std::size_t( startIndex ) + prevIndex] / units_per_em;
 
 					curvePoints.push_back( 0.5*( prevPointX + currPointX ) );
 					curvePoints.push_back( 0.5*( prevPointY + currPointY ) );
@@ -572,16 +566,16 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 		}
 
 		std::vector<Band> xBands( 32 );
-		std::array<UINT32, 2> xBandCounts = fillBand( curvePoints, curveStartOffsets, xBands, 0, &glyphCorners[std::size_t( 4 ) * rawGlyphIndex] );
+		std::array<UINT32, 2> xBandCounts = fillBand( curvePoints, curveStartOffsets, xBands, 0, &glyph_corners[std::size_t( 4 ) * rawGlyphIndex] );
 
 		std::vector<Band> yBands( 32 );
-		std::array<UINT32, 2> yBandCounts = fillBand( curvePoints, curveStartOffsets, yBands, 1, &glyphCorners[std::size_t( 4 ) * rawGlyphIndex] );
+		std::array<UINT32, 2> yBandCounts = fillBand( curvePoints, curveStartOffsets, yBands, 1, &glyph_corners[std::size_t( 4 ) * rawGlyphIndex] );
 
 		const UINT32 bandCount = std::max<UINT32>( xBandCounts[0], yBandCounts[0] );
 		const UINT32 curveCount = xBandCounts[1] + yBandCounts[1];
 
-		std::vector<UINT32>& currOffsetMap = offsetMaps[rawGlyphIndex];
-		std::vector<FLOAT32>& currPointMap = pointMaps[rawGlyphIndex];
+		std::vector<UINT32>& currOffsetMap = offset_maps[rawGlyphIndex];
+		std::vector<FLOAT32>& currPointMap = point_maps[rawGlyphIndex];
 
 		currOffsetMap.resize( std::size_t( bandCount )*4 + curveCount );
 
@@ -628,28 +622,28 @@ void noxcain::FontEngine::computeGlyph( UINT32 tableOffset, const std::vector<UI
 	}
 }
 
-void noxcain::FontEngine::readSimpleGlyph( std::vector<UINT16>& endPointIndices, std::vector<BYTE>& flags, std::vector<DOUBLE>& xCoords, std::vector<DOUBLE>& yCoords )
+void noxcain::FontEngine::readSimpleGlyph( ResourceFile& font_file, std::vector<UINT16>& endPointIndices, std::vector<BYTE>& flags, std::vector<DOUBLE>& xCoords, std::vector<DOUBLE>& yCoords )
 {
 	for( UINT32 index = 0; index < endPointIndices.size(); ++index )
 	{
-		endPointIndices[index] = read<UINT16>();
+		endPointIndices[index] = font_file.read_fundamental<UINT16>();
 	}
 
-	UINT16 instructionLength = read<UINT16>();
+	UINT16 instructionLength = font_file.read_fundamental<UINT16>();
 	std::vector<BYTE> instructions( instructionLength );
 
 	for( UINT32 index = 0; index < instructions.size(); ++index )
 	{
-		instructions[index] = read<BYTE>();
+		instructions[index] = font_file.read_fundamental<BYTE>();
 	}
 
 	while( flags.size() < std::size_t( endPointIndices.back() ) + 1 )
 	{
-		BYTE flag = read<BYTE>();
+		BYTE flag = font_file.read_fundamental<BYTE>();
 		flags.push_back( flag );
 		if( flag & 0x08 )
 		{
-			BYTE count = read<BYTE>();
+			BYTE count = font_file.read_fundamental<BYTE>();
 			while( count-- )
 			{
 				flags.push_back( flag );
@@ -666,7 +660,7 @@ void noxcain::FontEngine::readSimpleGlyph( std::vector<UINT16>& endPointIndices,
 		{
 			case 0x02:
 			{
-				xCoords.push_back( lastValue - read<BYTE>() );
+				xCoords.push_back( lastValue - font_file.read_fundamental<BYTE>() );
 				break;
 			}
 			case 0x10:
@@ -676,12 +670,12 @@ void noxcain::FontEngine::readSimpleGlyph( std::vector<UINT16>& endPointIndices,
 			}
 			case 0x12:
 			{
-				xCoords.push_back( lastValue + read<BYTE>() );
+				xCoords.push_back( lastValue + font_file.read_fundamental<BYTE>() );
 				break;
 			}
 			default:
 			{
-				xCoords.push_back( lastValue + read<INT16>() );
+				xCoords.push_back( lastValue + font_file.read_fundamental<INT16>() );
 				break;
 			}
 		}
@@ -696,7 +690,7 @@ void noxcain::FontEngine::readSimpleGlyph( std::vector<UINT16>& endPointIndices,
 		{
 			case 0x04:
 			{
-				yCoords.push_back( lastValue - read<BYTE>() );
+				yCoords.push_back( lastValue - font_file.read_fundamental<BYTE>() );
 				break;
 			}
 			case 0x20:
@@ -706,12 +700,12 @@ void noxcain::FontEngine::readSimpleGlyph( std::vector<UINT16>& endPointIndices,
 			}
 			case 0x24:
 			{
-				yCoords.push_back( lastValue + read<BYTE>() );
+				yCoords.push_back( lastValue + font_file.read_fundamental<BYTE>() );
 				break;
 			}
 			default:
 			{
-				yCoords.push_back( lastValue + read<INT16>() );
+				yCoords.push_back( lastValue + font_file.read_fundamental<INT16>() );
 				break;
 			}
 		}
@@ -722,13 +716,13 @@ void noxcain::FontEngine::readSimpleGlyph( std::vector<UINT16>& endPointIndices,
 	int stop = 0;
 }
 
-void noxcain::FontEngine::readCompositeGlyph()
+void noxcain::FontEngine::readCompositeGlyph( ResourceFile& font_file )
 {
 	UINT16 flags = 0;
 	do
 	{
-		flags = read<UINT16>();
-		UINT16 glyph_index = read<UINT16>();
+		flags = font_file.read_fundamental<UINT16>();
+		UINT16 glyph_index = font_file.read_fundamental<UINT16>();
 
 		DOUBLE argument1;
 		DOUBLE argument2;
@@ -737,83 +731,64 @@ void noxcain::FontEngine::readCompositeGlyph()
 		{
 			case 0x1:
 			{
-				argument1 = read<UINT16>();
-				argument2 = read<UINT16>();
+				argument1 = font_file.read_fundamental<UINT16>();
+				argument2 = font_file.read_fundamental<UINT16>();
 				break;
 			}
 			case 0x2:
 			{
-				argument1 = read<INT8>();
-				argument2 = read<INT8>();
+				argument1 = font_file.read_fundamental<INT8>();
+				argument2 = font_file.read_fundamental<INT8>();
 				break;
 			}
 			case 0x3:
 			{
-				argument1 = read<INT16>();
-				argument2 = read<INT16>();
+				argument1 = font_file.read_fundamental<INT16>();
+				argument2 = font_file.read_fundamental<INT16>();
 				break;
 			}
 			default:
 			{
-				argument1 = read<UINT8>();
-				argument2 = read<UINT8>();
+				argument1 = font_file.read_fundamental<UINT8>();
+				argument2 = font_file.read_fundamental<UINT8>();
 				break;
 			}
 		}
 
 		if( flags & 0x0008 )
 		{
-			DOUBLE a1 = readF2Dot14();
+			DOUBLE a1 = font_file.read_f2dot14();
 		}
 		else if( flags & 0x0040 )
 		{
-			DOUBLE a1 = readF2Dot14();
-			DOUBLE a2 = readF2Dot14();
+			DOUBLE a1 = font_file.read_f2dot14();
+			DOUBLE a2 = font_file.read_f2dot14();
 		}
 		else if( flags & 0x0080 )
 		{
-			DOUBLE a1 = readF2Dot14();
-			DOUBLE a2 = readF2Dot14();
-			DOUBLE a3 = readF2Dot14();
-			DOUBLE a4 = readF2Dot14();
+			DOUBLE a1 = font_file.read_f2dot14();
+			DOUBLE a2 = font_file.read_f2dot14();
+			DOUBLE a3 = font_file.read_f2dot14();
+			DOUBLE a4 = font_file.read_f2dot14();
 		}
 	} while( flags & 0x0020 );
 }
 
-noxcain::DOUBLE noxcain::FontEngine::readF2Dot14()
-{
-	char word[2];
-	font.read( word, 2 );
-	signed char front = 0;
-	front = front | ( word[0] & 0x80 ) | ( ( word[0] & 0x40 ) >> 6 );
-	word[0] &= 0x3F;
-	if( isLittleEndian )
-	{
-		char temp = word[1];
-		word[1] = word[0];
-		word[0] = temp;
-	}
-
-	UINT16 frac;
-	memcpy( &frac, word, 2 );
-
-	return DOUBLE( front ) + ( frac / 16384 );
-}
-
 bool noxcain::FontEngine::readFont( const std::string& fontPath )
 {
-
-	font.open( fontPath.c_str() );
-	if( font.is_open() )
+	std::ifstream file( fontPath );
+	if( file.is_open() )
 	{
-		UINT32 endianCheck = 1;
-		isLittleEndian = reinterpret_cast<unsigned char*>( &endianCheck )[0] > 0;
-
-		const UINT32 version = read<UINT32>();
-		const UINT16 nTables = read<UINT16>();
-		const UINT16 searchRange = read<UINT16>();
-		const UINT16 entrySelector = read<UINT16>();
-		const UINT16 rangeShift = read<UINT16>();
+		int hug_me = 0;
+	}
+	ResourceFile font_file;
+	if( font_file.open( fontPath, false ) )
+	{
+		const UINT32 version = font_file.read_fundamental<UINT32>();
+		const UINT16 nTables = font_file.read_fundamental<UINT16>();
+		const UINT16 searchRange = font_file.read_fundamental<UINT16>();
+		const UINT16 entrySelector = font_file.read_fundamental<UINT16>();
+		const UINT16 rangeShift = font_file.read_fundamental<UINT16>();
 
 		struct TableRecord
 		{
@@ -826,10 +801,10 @@ bool noxcain::FontEngine::readFont( const std::string& fontPath )
 		for( UINT32 tableIndex = 0; tableIndex < nTables; ++tableIndex )
 		{
 			TableRecord record;
-			record.tag = read<UINT32>();
-			record.checkSum = read<UINT32>();
-			record.offset = read<UINT32>();
-			record.length = read<UINT32>();
+			record.tag = font_file.read_fundamental<UINT32>();
+			record.checkSum = font_file.read_fundamental<UINT32>();
+			record.offset = font_file.read_fundamental<UINT32>();
+			record.length = font_file.read_fundamental<UINT32>();
 
 			switch( record.tag )
 			{
@@ -865,40 +840,40 @@ bool noxcain::FontEngine::readFont( const std::string& fontPath )
 			}
 		};
 
-		const UINT32 nGlyphs = getNumGlyphs( maxp.offset );
-		const bool longOffset = isLongOffset( head.offset );
+		const UINT32 nGlyphs = getNumGlyphs( font_file, maxp.offset );
+		const bool longOffset = isLongOffset( font_file, head.offset );
 		
 		//advanceHeights.resize( nGlyphs );
-		advanceWidths.resize( nGlyphs );
+		advance_widths.resize( nGlyphs );
 
 		//topBearings.resize( nGlyphs );
-		leftBearings.resize( nGlyphs );
+		left_bearings.resize( nGlyphs );
 
-		glyphIndices.resize( nGlyphs, INVALID_UNICODE );
+		glyph_indices.resize( nGlyphs, INVALID_UNICODE );
 
-		createHorizontalMetrics( hhea.offset, hmtx.offset );
+		createHorizontalMetrics( font_file, hhea.offset, hmtx.offset );
 		if( vhea.length > 0 )
 		{
-			createVerticalMetrics( vhea.offset, vmtx.offset );
+			createVerticalMetrics( font_file, vhea.offset, vmtx.offset );
 		}
 		
 
-		font.seekg( loca.offset );
+		font_file.set_position( loca.offset );
 		std::vector<UINT32> glyphTableOffsets( std::size_t( nGlyphs ) + 1 );
 		for( UINT32 glyph_index = 0; glyph_index < nGlyphs + 1; ++glyph_index )
 		{
-			glyphTableOffsets[glyph_index] = longOffset ? read<UINT32>() : UINT32( 2 )*read<UINT16>();
+			glyphTableOffsets[glyph_index] = longOffset ? font_file.read_fundamental<UINT32>() : UINT32( 2 )*font_file.read_fundamental<UINT16>();
 		}
 
-		computeGlyph( glyf.offset, glyphTableOffsets );
+		computeGlyph( font_file, glyf.offset, glyphTableOffsets );
 
-		createUnicodeMap( cmap.offset );
+		createUnicodeMap( font_file, cmap.offset );
 		
-		if( getGlyphCount() )
+		if( get_glyph_count() )
 		{
 			return true;
 		}
-		font.close();
+		font_file.close();
 	}
 	return false;
 }

@@ -5,7 +5,7 @@ target_sources( windowslib
 		 Windows.hpp Windows.cpp
 )
 
-target_compile_features( windowslib PUBLIC cxx_std_17 )
+target_compile_features( windowslib PUBLIC cxx_std_20 )
 
 add_definitions( -DVK_USE_PLATFORM_WIN32_KHR )
 add_definitions( -DVULKAN_HPP_NO_EXCEPTIONS )

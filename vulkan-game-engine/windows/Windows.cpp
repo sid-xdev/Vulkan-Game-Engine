@@ -1,3 +1,5 @@
+#ifdef WIN32  
+
 #include <windows/Windows.hpp>
 
 #include <vulkan/vulkan.hpp>
@@ -18,24 +20,6 @@ LRESULT CALLBACK noxcain::Window::process_message( _In_ HWND hWnd, _In_ UINT uMs
 	{
 		case WM_KEYDOWN:
 		{
-			/*
-			if( wParam == 0x57 )
-			{
-				RECT rect;
-				GetWindowRect( window_handle, &rect );
-				SetWindowPos( window_handle, NULL, rect.left, 0, ( rect.right - rect.left )/2, ( rect.bottom - rect.top )/2, NULL );
-			}
-
-			if( wParam == 0x51 )
-			{
-				LogicEngine::pause();
-			}
-
-			if( wParam == 0x45 )
-			{
-				LogicEngine::resume();
-			}
-			*/
 			LogicEngine::set_event( InputEventTypes::KEY_DOWN, 0, 0, UINT32( wParam ) );
 			break;
 		}
@@ -285,34 +269,4 @@ LPCSTR noxcain::WindowClass::get_class_id() const
 
 const std::string noxcain::WindowClass::CLASS_NAME( "nxVulkanDefaultWindowClass" );
 
-void noxcain::WindowsFile::close()
-{
-	file.close();
-}
-
-void noxcain::WindowsFile::open( const char* path )
-{
-	file.open( std::string("Assets/") + path, std::ios::binary );
-}
-
-bool noxcain::WindowsFile::is_open() const
-{
-	return file.is_open();
-}
-
-noxcain::NxFile& noxcain::WindowsFile::seekg( UINT32 offset )
-{
-	file.seekg( offset );
-	return *this;
-}
-
-UINT32 noxcain::WindowsFile::tellg()
-{
-	return file.tellg();
-}
-
-noxcain::NxFile& noxcain::WindowsFile::read( char* buffer, std::size_t count )
-{
-	file.read( buffer, count );
-	return *this;
-}
+#endif //WIN32

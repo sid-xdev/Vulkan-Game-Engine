@@ -18,7 +18,7 @@ void noxcain::VectorText::calculate_offsets()
 	
 	for( const auto unicode : unicodes )
 	{
-		const auto info = font.getCharacterInfo( unicode );
+		const auto info = font.get_character_info( unicode );
 		
 		if( ( fixed_line_length && x_offset > 0 && x_offset + info.advance_width > fixed_line_length ) || unicode == 0xA )
 		{
@@ -37,7 +37,7 @@ void noxcain::VectorText::calculate_offsets()
 		}
 	};
 	line_lengths.push_back( x_offset );
-	max_height = line_lengths.size() * line_height - font.getLineGap();
+	max_height = line_lengths.size() * line_height - font.get_line_gap();
 }
 
 void noxcain::VectorText::set_base_color( const std::array<FLOAT32, 4>& color )
@@ -92,7 +92,7 @@ void noxcain::VectorText::set_font_id( std::size_t id )
 {
 	font_index = id;
 	const auto& font = ResourceEngine::get_engine().get_font( font_index );
-	line_height = font.getAscender() - font.getDescender() + font.getLineGap();
+	line_height = font.get_ascender() - font.get_descender() + font.get_line_gap();
 	calculate_offsets();
 }
 
@@ -103,7 +103,7 @@ const noxcain::FontResource& noxcain::VectorText::get_font() const
 
 noxcain::DOUBLE noxcain::VectorText::get_descender() const
 {
-	return get_font().getDescender();
+	return get_font().get_descender();
 }
 
 void noxcain::VectorText::set_color( FLOAT32 red, FLOAT32 green, FLOAT32 blue, FLOAT32 alpha )

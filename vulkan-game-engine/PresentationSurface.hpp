@@ -39,18 +39,4 @@ namespace noxcain
 			return false;
 		}
 	};
-
-	/// <summary>
-	/// temporary solution for file access on windows and android
-	/// </summary>
-	class NxFile
-	{
-	public:
-		virtual void close() = 0;
-		virtual void open( const char* path ) = 0;
-		virtual bool is_open() const = 0;
-		virtual NxFile& seekg( UINT32 offset ) = 0;
-		virtual UINT32 tellg() = 0;
-		virtual NxFile& read( char* buffer, std::size_t count ) = 0;
-	};
 };

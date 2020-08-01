@@ -13,4 +13,4 @@ target_sources( levellib
 		MineSweeperLevel.hpp
 )	
 
-target_compile_features( levellib PUBLIC cxx_std_17 )
+target_compile_features( levellib PUBLIC cxx_std_20 )

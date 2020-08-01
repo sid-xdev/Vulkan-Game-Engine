@@ -27,16 +27,16 @@ namespace noxcain
 		ANativeWindow* used_window = nullptr;
 	};
 
-	class AndroidFile : public NxFile
+	class AndroidFile
 	{
 	public:
 		static void set_manager( AAssetManager* manager );
-		void open( const char* path ) override;
-		bool is_open() const override;
-		NxFile& seekg( UINT32 offset ) override;
-		UINT32 tellg() override;
-		NxFile& read( char* buffer, std::size_t count ) override;
-		void close() override;
+		void open( const char* path );
+		bool is_open() const;
+		NxFile& seekg( UINT32 offset );
+		UINT32 tellg();
+		NxFile& read_fundamental( char* buffer, std::size_t count );
+		void close();
 	private:
 		static AAssetManager* asset_manager;
 		AAsset* file = nullptr;

@@ -38,7 +38,7 @@ target_sources( renderlib
 		RenderQuery.hpp
 )	
 
-target_compile_features( renderlib PUBLIC cxx_std_17 )
+target_compile_features( renderlib PUBLIC cxx_std_20 )
 
 if( ${CMAKE_SYSTEM_NAME} STREQUAL "Windows" )
 	add_definitions( -DVK_USE_PLATFORM_WIN32_KHR )

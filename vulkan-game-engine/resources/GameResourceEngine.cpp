@@ -20,7 +20,7 @@ void noxcain::ResourceEngine::read_font( const std::vector<std::string>& font_pa
 	for( std::size_t font_index = 0; font_index < fonts.size(); ++font_index )
 	{
 		fonts[font_index].readFont( font_paths[font_index] );
-		total_glyph_count += fonts[font_index].getGlyphCount();
+		total_glyph_count += fonts[font_index].get_glyph_count();
 	}
 
 	const std::size_t vertex_buffer_size = sizeof( FLOAT32 ) * 8 * total_glyph_count;
@@ -108,7 +108,7 @@ void noxcain::ResourceEngine::read_font( const std::vector<std::string>& font_pa
 		std::vector<std::size_t> point_ids = { point_resource_id };
 		subresources[point_resource_id].setData( std::move( point_buffer ) );
 
-		font_resources.emplace_back( 0, std::vector<UINT32>(), std::move( chars ), 1.0, 0.0, 0.0,
+		font_resources.emplace_back( 0, std::vector<FontResource::UnicodeRange>(), std::move( chars ), 1.0, 0.0, 0.0,
 									 std::move( offset_ids ), std::move( point_ids ), vertex_buffer_resource_id );
 		resource_limits.font_count = 1;
 	}
@@ -117,37 +117,64 @@ void noxcain::ResourceEngine::read_font( const std::vector<std::string>& font_pa
 
 	for( const FontEngine& fe : fonts )
 	{
-		std::size_t current_glyph_count = fe.getGlyphCount();
+		std::size_t current_glyph_count = fe.get_glyph_count();
 		if( current_glyph_count )
 		{
-			std::vector<UINT32> unicode;
-			unicode.reserve( fe.unicode_map.size() );
-			for( const auto& uni : fe.unicode_map )
+			std::vector<FontResource::UnicodeRange> unicode;
+			unicode.reserve( fe.unicode_ranges.size() / 3 );
+			for( std::size_t index = 0; index < fe.unicode_ranges.size(); index += 3 )
 			{
-				unicode.emplace_back( uni );
+				unicode.push_back( { fe.unicode_ranges[index+0], fe.unicode_ranges[index+1], fe.unicode_ranges[index+2] } );
+			}
+			std::sort( unicode.begin(), unicode.end(), []( const auto& first_element, const auto& second_element )
+			{
+				return first_element.end < second_element.end;
+			} );
+
+			for( std::size_t index = 1; index < unicode.size(); ++index )
+			{
+				std::size_t count = std::size_t( unicode[index-1].end ) - std::size_t( unicode[index-1].start ) + 1;
+				if( unicode[index-1].end + 1 == unicode[index].start && unicode[index-1].index + count == unicode[index].index )
+				{
+					unicode[index].start = unicode[index-1].start;
+					unicode[index].index = unicode[index-1].index;
+					unicode[index-1].index = 0;
+				}
+			}
+
+			{
+				std::vector<FontResource::UnicodeRange> ranges;
+				unicode.swap( ranges );
+				for( const auto& range : ranges )
+				{
+					if( range.index )
+					{
+						unicode.emplace_back( range );
+					}
+				}
 			}
 
 			std::vector<FontResource::CharacterInfo> chars;
-			chars.reserve( fe.glyphIndices.size() );
-			for( std::size_t index = 0; index < fe.glyphIndices.size(); ++index )
+			chars.reserve( fe.glyph_indices.size() );
+			for( std::size_t index = 0; index < fe.glyph_indices.size(); ++index )
 			{
-				chars.push_back( FontResource::CharacterInfo( { fe.glyphIndices[index], DOUBLE( fe.advanceWidths[index] ) } ) );
+				chars.push_back( FontResource::CharacterInfo( { fe.glyph_indices[index], DOUBLE( fe.advance_widths[index] ) } ) );
 			}
 
 			FLOAT32* memory = reinterpret_cast<FLOAT32*>( vertex_buffer.data() + sizeof( FLOAT32 ) * 8 * font_offset );
 			for( std::size_t glyph_index = 0; glyph_index < current_glyph_count; ++glyph_index )
 			{
-				memory[8 * glyph_index] = fe.glyphCorners[4 * glyph_index];
-				memory[8 * glyph_index + 1] = fe.glyphCorners[4 * glyph_index + 3];
+				memory[8 * glyph_index] = fe.glyph_corners[4 * glyph_index];
+				memory[8 * glyph_index + 1] = fe.glyph_corners[4 * glyph_index + 3];
 
-				memory[8 * glyph_index + 2] = fe.glyphCorners[4 * glyph_index + 2];
-				memory[8 * glyph_index + 3] = fe.glyphCorners[4 * glyph_index + 3];
+				memory[8 * glyph_index + 2] = fe.glyph_corners[4 * glyph_index + 2];
+				memory[8 * glyph_index + 3] = fe.glyph_corners[4 * glyph_index + 3];
 
-				memory[8 * glyph_index + 4] = fe.glyphCorners[4 * glyph_index];
-				memory[8 * glyph_index + 5] = fe.glyphCorners[4 *glyph_index + 1];
+				memory[8 * glyph_index + 4] = fe.glyph_corners[4 * glyph_index];
+				memory[8 * glyph_index + 5] = fe.glyph_corners[4 *glyph_index + 1];
 
-				memory[8 * glyph_index + 6] = fe.glyphCorners[4 * glyph_index + 2];
-				memory[8 * glyph_index + 7] = fe.glyphCorners[4 * glyph_index + 1];
+				memory[8 * glyph_index + 6] = fe.glyph_corners[4 * glyph_index + 2];
+				memory[8 * glyph_index + 7] = fe.glyph_corners[4 * glyph_index + 1];
 			}
 
 			std::vector<std::size_t> offset_ids;
@@ -182,7 +209,7 @@ void noxcain::ResourceEngine::read_font( const std::vector<std::string>& font_pa
 			}
 
 			font_resources.push_back( FontResource( font_offset, std::move( unicode ), std::move( chars ),
-													fe.ascender, fe.descender, fe.lineGap, 
+													fe.ascender, fe.descender, fe.line_gap, 
 													std::move( offset_ids ), std::move( pointIds ),
 													vertex_buffer_resource_id ) );
 			resource_limits.font_count++;
@@ -356,10 +383,10 @@ void noxcain::ResourceEngine::read_hex_geometry()
 	{
 		for( std::size_t count = 0; count < 2 * nCorners - 1; ++count )
 		{
-			hexagonIndices[bufferPos++] = ( startVertexIndex + count ) % ( 2 * nCorners ) + 2 * nCorners * ( ring + 1 );
-			hexagonIndices[bufferPos++] = ( startVertexIndex + 1 + count ) % ( 2 * nCorners ) + 2 * nCorners * ( ring );
+			hexagonIndices[bufferPos++] = UINT32( startVertexIndex + count ) % ( 2 * nCorners ) + 2 * nCorners * ( ring + 1 );
+			hexagonIndices[bufferPos++] = UINT32( startVertexIndex + 1 + count ) % ( 2 * nCorners ) + 2 * nCorners * ( ring );
 		}
-		std::size_t value = ( startVertexIndex + ( 2 * nCorners - 1 ) ) % ( 2 * nCorners ) + 2 * nCorners * ( ring + 1 );
+		UINT32 value = UINT32( startVertexIndex + ( 2 * nCorners - 1 ) ) % ( 2 * nCorners ) + 2 * nCorners * ( ring + 1 );
 		hexagonIndices[bufferPos++] = value;
 		hexagonIndices[bufferPos++] = value + 1;
 	}

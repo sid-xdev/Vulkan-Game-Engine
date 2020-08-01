@@ -1,6 +1,7 @@
 #include "Label.hpp"
 
 #include <resources/FontResource.hpp>
+#include <resources/BoundingBox.hpp>
 #include <cmath>
 
 noxcain::VectorTextLabel2D::VectorTextLabel2D( GameUserInterface& ui ) :
@@ -174,7 +175,7 @@ void noxcain::VectorTextLabel2D::set_centered_icon( DOUBLE size, UINT32 unicode 
 		if( unicodes.size() )
 		{
 			const DOUBLE font_size = get_text_element().get_size();
-			const BoundingBox icon_bounding_box = get_text_element().get_font().getCharBoundingBox( unicodes.front() );
+			const BoundingBox icon_bounding_box = get_text_element().get_font().get_character_bounding_box( unicodes.front() );
 			return -font_size*icon_bounding_box.get_left() + 0.5*( background.get_width() - font_size*icon_bounding_box.get_width() );
 		}
 		return 0.0;
@@ -188,9 +189,9 @@ void noxcain::VectorTextLabel2D::set_centered_icon( DOUBLE size, UINT32 unicode 
 		{
 			const DOUBLE font_size = get_text_element().get_size();
 			const auto& font = get_text_element().get_font();
-			const BoundingBox icon_bounding_box = font.getCharBoundingBox( unicodes.front() );
+			const BoundingBox icon_bounding_box = font.get_character_bounding_box( unicodes.front() );
 			
-			return -font_size*( icon_bounding_box.get_bottom() - font.getDescender() ) + 0.5*( background.get_height() - font_size*icon_bounding_box.get_height() );
+			return -font_size*( icon_bounding_box.get_bottom() - font.get_descender() ) + 0.5*( background.get_height() - font_size*icon_bounding_box.get_height() );
 		}
 		return 0.0;
 	};

@@ -69,14 +69,14 @@ bool noxcain::MemoryManager::request_resource_memory()
 		for( std::size_t font_id = 0; font_id < fonts.size(); ++font_id )
 		{	
 			// fill up offset buffers
-			for( auto offset_subresource_id : fonts[font_id].getOffsetSubResourceIds() )
+			for( auto offset_subresource_id : fonts[font_id].get_offset_map_resource_ids() )
 			{
 				const auto& block = get_block( offset_subresource_id );
 				point_offset_buffers.emplace_back( block.buffer, block.offset, block.size );
 			}
 
 			// fill up pointer buffers
-			for( auto points_subresource_id : fonts[font_id].getPointSubResourceIds() )
+			for( auto points_subresource_id : fonts[font_id].get_point_map_resource_ids() )
 			{
 				const auto& block = get_block( points_subresource_id );
 				point_buffers.emplace_back( block.buffer, block.offset, block.size );

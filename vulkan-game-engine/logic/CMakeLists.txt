@@ -40,4 +40,4 @@ target_sources( logiclib
 add_subdirectory( level )
 add_subdirectory( gui )
 
-target_compile_features( logiclib PUBLIC cxx_std_17 )
+target_compile_features( logiclib PUBLIC cxx_std_20 )

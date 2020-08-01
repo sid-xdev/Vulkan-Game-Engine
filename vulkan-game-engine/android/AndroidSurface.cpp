@@ -1,3 +1,5 @@
+#ifdef __ANDROID__
+
 #include "AndroidSurface.hpp"
 #include "../logic/GameLogicEngine.hpp"
 
@@ -178,3 +180,5 @@ void noxcain::AndroidFile::close() {
         AAsset_close( file );
     }
 }
+
+#endif // __ANDROID__

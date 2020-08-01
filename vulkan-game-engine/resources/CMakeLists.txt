@@ -23,4 +23,4 @@ target_sources( resourceslib
 		ResourceTools.hpp
 )	
 
-target_compile_features( resourceslib PUBLIC cxx_std_17 )
+target_compile_features( resourceslib PUBLIC cxx_std_20 )

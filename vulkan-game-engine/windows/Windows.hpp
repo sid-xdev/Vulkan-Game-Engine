@@ -1,5 +1,6 @@
 #pragma once
 #include <PresentationSurface.hpp>
+#include <ResourceFile.hpp>
 #include <Windows.h>
 #include <string>
 #include <thread>
@@ -106,21 +107,5 @@ namespace noxcain
 		Window( std::shared_ptr<WindowClass> window_class );
 
 		~Window();
-	};
-
-	/// <summary>
-	/// Hides os-specififc file operations
-	/// </summary>
-	class WindowsFile : public NxFile
-	{
-	public:
-		void close() override;
-		void open( const char* path ) override;
-		bool is_open() const override;
-		NxFile& seekg( UINT32 offset ) override;
-		UINT32 tellg() override;
-		NxFile& read( char* buffer, std::size_t count ) override;
-	private:
-		std::ifstream file;
 	};
 }

@@ -352,7 +352,7 @@ bool noxcain::OverlayTask::record( const std::vector<vk::CommandBuffer>& buffers
 				const UINT32 text_count = ui.depth_order[order_index][1];
 				if( text_count )
 				{
-					const auto& vertex_block_info = GraphicEngine::get_memory_manager().get_block( ResourceEngine::get_engine().get_font( 0 ).getVertexBlockId() );
+					const auto& vertex_block_info = GraphicEngine::get_memory_manager().get_block( ResourceEngine::get_engine().get_font( 0 ).get_vertex_block_id() );
 					overlay_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, text_pipeline );
 					overlay_buffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, text_pipeline_layout, 0, { GraphicEngine::get_descriptor_set_manager().get_basic_set( BasicDescriptorSets::GLYPHS ) }, {} );
 					overlay_buffer.bindVertexBuffers( 0, { vertex_block_info.buffer }, { vertex_block_info.offset } );
