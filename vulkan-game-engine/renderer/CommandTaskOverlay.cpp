@@ -328,36 +328,30 @@ bool noxcain::OverlayTask::record( const std::vector<vk::CommandBuffer>& buffers
 		vk::Rect2D default_scissor( vk::Offset2D( 0, 0 ), GraphicEngine::get_window_resolution() );
 		vk::Rect2D current_scissor;
 
-		const auto& uis = LogicEngine::get_user_interfaces();
-
-
-
-		for( const GameUserInterface& ui : uis )
+		for( const GameUserInterface& ui : LogicEngine::get_user_interfaces() )
 		{
-			auto label_iter = ui.labels.begin();
-			auto text_iter = ui.texts.begin();
+			auto label_iter = ui.get_label_iterator();
+			auto text_iter = ui.get_text_iterator();
 			UINT32 order_index = 0;
-			while( order_index < ui.depth_order.size() )
+			for( const auto& order : ui.get_order() )
 			{
-				const UINT32 label_count = ui.depth_order[order_index][0];
-				if( label_count )
+				if( order.label_count )
 				{
 					overlay_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, label_pipeline );
 				}
-				for( UINT32 index = 0; index < label_count; ++index, ++label_iter )
+				for( UINT32 index = 0; index < order.label_count; ++index, ++label_iter )
 				{
 					current_scissor = label_iter->get().record( overlay_buffer, label_pipeline_layout, current_scissor, default_scissor );
 				}
 
-				const UINT32 text_count = ui.depth_order[order_index][1];
-				if( text_count )
+				if( order.text_count )
 				{
 					const auto& vertex_block_info = GraphicEngine::get_memory_manager().get_block( ResourceEngine::get_engine().get_font( 0 ).get_vertex_block_id() );
 					overlay_buffer.bindPipeline( vk::PipelineBindPoint::eGraphics, text_pipeline );
 					overlay_buffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, text_pipeline_layout, 0, { GraphicEngine::get_descriptor_set_manager().get_basic_set( BasicDescriptorSets::GLYPHS ) }, {} );
 					overlay_buffer.bindVertexBuffers( 0, { vertex_block_info.buffer }, { vertex_block_info.offset } );
 				}
-				for( UINT32 index = 0; index < text_count; ++index, ++text_iter )
+				for( UINT32 index = 0; index < order.text_count; ++index, ++text_iter )
 				{
 					current_scissor = text_iter->get().record( overlay_buffer, text_pipeline_layout, current_scissor, default_scissor );
 				}

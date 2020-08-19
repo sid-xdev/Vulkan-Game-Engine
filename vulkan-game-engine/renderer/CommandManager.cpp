@@ -254,6 +254,7 @@ bool noxcain::CommandManager::validate_frame_buffers()
 		if( r_handle.all_okay() )
 		{
 			device.destroyFramebuffer( deferred_frame_buffer );
+			deferred_frame_buffer = vk::Framebuffer();
 
 			if( !GraphicEngine::get_memory_manager().setup_main_render_destination() )
 			{
@@ -645,8 +646,8 @@ void noxcain::CommandManager::prepare_main_loop()
 	
 	//TODO destroy temp host objects?
 
-	const vk::Device device = master.core->getLogicalDevice();
-	const vk::SwapchainKHR swapChain = master.core->getSwapChain();
+	const vk::Device device = master.core->get_logical_device();
+	const vk::SwapchainKHR swapChain = master.core->get_swapchain();
 	const std::vector<vk::Image> images;
 	const auto& swapChainReturn = device.getSwapchainImagesKHR( swapChain );
 	const std::size_t nImages = swapChainReturn.value.size();

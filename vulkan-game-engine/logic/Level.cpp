@@ -27,6 +27,23 @@ void noxcain::GameLevel::set_status( Status newStatus )
 	status = newStatus;
 }
 
+void noxcain::GameLevel::clear_user_interfaces()
+{
+	for( GameUserInterface& user_interface : user_interfaces )
+	{
+		if( user_interface.regional_event_root )
+		{
+			user_interface.regional_event_root->cut_branch();
+		}
+	}
+	user_interfaces.clear();
+}
+
+void noxcain::GameLevel::add_user_interface( GameUserInterface& new_interface )
+{
+	user_interfaces.emplace_back( new_interface );
+}
+
 void noxcain::GameLevel::update_key_events( const std::vector<KeyEvent>& key_events )
 {
 	
@@ -46,6 +63,14 @@ void noxcain::GameLevel::update_logic( const std::chrono::nanoseconds& deltaTime
 
 	if( !regional_exclusiv.hit( region_key_events ) )
 	{
+		ui_root->collapse_branch();
+		for( GameUserInterface& interface : user_interfaces )
+		{
+			if( interface.regional_event_root )
+			{
+				ui_root->add_branch( *interface.regional_event_root );
+			}
+		}
 		ui_root->hit_tree( region_key_events, interaction_parent_stack, interaction_children_stack, interaction_miss_stack );
 	}
 

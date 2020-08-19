@@ -18,6 +18,7 @@ namespace noxcain
 		
 		GameUserInterface default_ui;
 		GameUserInterface settings_ui;
+		GameUserInterface performance_ui;
 
 		std::vector<CubicSpline> splines;
 		DOUBLE progress = 0.0;
@@ -79,22 +80,45 @@ namespace noxcain
 		std::unique_ptr<VectorText2D> gpu_cycle_label;
 
 		//TEST BUTTONS
+		std::unique_ptr<PassivRecieverNode> performance_ui_base;
 		std::unique_ptr<BaseButton> debug_button;
 		std::unique_ptr<BaseButton> switch_font_button;
+		
+		//STANDART
+		std::unique_ptr<PassivRecieverNode> default_ui_base;
 		std::unique_ptr<BaseButton> exit_button;
+		std::unique_ptr<BaseButton> config_button;
 
 		NxVector3D last_position;
 		NxVector3D last_direction;
 
 		/// <summary>
+		/// Iniatlized perfomance HUD objects
+		/// </summary>
+		void create_performance_hud();
+
+		/// <summary>
+		/// Iniatlized default HUD objects
+		/// </summary>
+		void create_default_hud();
+
+		/// <summary>
 		/// Iniatlized HUD objects for the graphic settings
 		/// </summary>
-		void create_settings();
+		void create_settings_hud();
 
+		/// <summary>
+		/// updates content of the setting hud objects with the current graphic settings and shows the hud
+		/// </summary>
+		void display_settings();
+
+		//Anti-aliasing-settings
 		std::unique_ptr<VectorTextLabel2D> sampling_description_label;
 		std::unique_ptr<VectorTextLabel2D> sampling_description_value;
 		std::unique_ptr<BaseButton> sampling_increase_button;
 		std::unique_ptr<BaseButton> sampling_decrease_button;
+
+		std::unique_ptr<PassivRecieverNode> settings_background;
 	public:
 		MineSweeperLevel();
 		~MineSweeperLevel();

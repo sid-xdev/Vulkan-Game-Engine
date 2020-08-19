@@ -8,7 +8,7 @@
 
 #include <array>
 
-bool noxcain::GraphicCore::pickPhysicalDevice()
+bool noxcain::GraphicCore::pick_physical_device()
 {
 	ResultHandler resultHandler( vk::Result::eSuccess );
 	std::vector<vk::PhysicalDevice> devices = resultHandler << instance.enumeratePhysicalDevices();
@@ -79,7 +79,7 @@ bool noxcain::GraphicCore::pickPhysicalDevice()
 	return true;
 }
 
-bool noxcain::GraphicCore::createDevice()
+bool noxcain::GraphicCore::create_device()
 {
 	ResultHandler r_handler( vk::Result::eSuccess );
 	
@@ -97,11 +97,11 @@ bool noxcain::GraphicCore::createDevice()
 
 	vk::DeviceCreateInfo deviceCreateInfo( vk::DeviceCreateFlags(), UINT32( queueCreateInfos.size() ), queueCreateInfos.data(), 0, nullptr, UINT32( necessaryDeviceExtensions.size() ), necessaryDeviceExtensions.data() );
 
-	logical_device = r_handler << getPhysicalDevice().createDevice( deviceCreateInfo );
+	logical_device = r_handler << get_physical_device().createDevice( deviceCreateInfo );
 	return r_handler.all_okay();
 }
 
-bool noxcain::GraphicCore::createSwapchain( const vk::SwapchainKHR& oldSwapChain )
+bool noxcain::GraphicCore::create_swapchain( const vk::SwapchainKHR& oldSwapChain )
 {
 	ResultHandler r_handler( vk::Result::eSuccess );
 	const vk::PhysicalDevice& physicalDevice = candidates[deviceIndex].device;
@@ -237,9 +237,9 @@ bool noxcain::GraphicCore::initialize( std::shared_ptr<PresentationSurface> os_s
 			surface = os_surface->create_surface( instance );
 			if( surface )
 			{
-				if( pickPhysicalDevice() && 
-					createDevice() && 
-					createSwapchain( swapChain ) )
+				if( pick_physical_device() && 
+					create_device() && 
+					create_swapchain( swapChain ) )
 				{
 					return true;
 				}
@@ -269,7 +269,7 @@ noxcain::GraphicCore::~GraphicCore()
 	}
 }
 
-bool noxcain::GraphicCore::switchToNextPhysicalDevice()
+bool noxcain::GraphicCore::use_next_physical_device()
 {
 	if( logical_device )
 	{
@@ -290,7 +290,7 @@ bool noxcain::GraphicCore::switchToNextPhysicalDevice()
 		return false;
 	}
 
-	createDevice();
+	create_device();
 	return true;
 }
 
@@ -309,32 +309,32 @@ vk::Extent2D noxcain::GraphicCore::get_window_extent() const
 	return surfaceExtent;
 }
 
-vk::Format noxcain::GraphicCore::getPresentationSurfaceFormat() const
+vk::Format noxcain::GraphicCore::get_presentation_surface_format() const
 {
 	return surfaceFormat;
 }
 
-vk::PhysicalDevice noxcain::GraphicCore::getPhysicalDevice() const
+vk::PhysicalDevice noxcain::GraphicCore::get_physical_device() const
 {
 	return candidates[deviceIndex].device;
 }
 
-vk::Device noxcain::GraphicCore::getLogicalDevice() const
+vk::Device noxcain::GraphicCore::get_logical_device() const
 {
 	return logical_device;
 }
 
-vk::SurfaceKHR noxcain::GraphicCore::getSurface() const
+vk::SurfaceKHR noxcain::GraphicCore::get_surface() const
 {
 	return surface;
 }
 
-vk::SwapchainKHR noxcain::GraphicCore::getSwapChain() const
+vk::SwapchainKHR noxcain::GraphicCore::get_swapchain() const
 {
 	return swapChain;
 }
 
-vk::ImageView noxcain::GraphicCore::getImageView( UINT32 index ) const
+vk::ImageView noxcain::GraphicCore::get_image_view( UINT32 index ) const
 {
 	return swapChainImageViews[index];
 }
@@ -363,7 +363,7 @@ bool noxcain::GraphicCore::recreate_swapchain( bool recreate_surface )
 
 	vk::SwapchainKHR oldSwapChain = swapChain;
 
-	bool result = createSwapchain( recreate_surface ? vk::SwapchainKHR() : oldSwapChain );
+	bool result = create_swapchain( recreate_surface ? vk::SwapchainKHR() : oldSwapChain );
 
 	logical_device.destroySwapchainKHR( oldSwapChain );
 	return result;

@@ -20,10 +20,10 @@ std::unique_ptr<noxcain::GraphicEngine> noxcain::GraphicEngine::engine = std::un
 bool noxcain::GraphicEngine::clear()
 {
 	ResultHandler r_handler( vk::Result::eSuccess );
-	vk::Device device = core->getLogicalDevice();
+	vk::Device device = core->get_logical_device();
 	if( device )
 	{
-		r_handler << core->getLogicalDevice().waitIdle();
+		r_handler << core->get_logical_device().waitIdle();
 		if( r_handler.all_okay() )
 		{
 			commands.reset( nullptr );
@@ -59,7 +59,7 @@ bool noxcain::GraphicEngine::run( std::shared_ptr<PresentationSurface> os_surfac
 			{
 				engine->clear();
 
-				if( !engine->core->switchToNextPhysicalDevice() )
+				if( !engine->core->use_next_physical_device() )
 				{
 					return false;
 				}
@@ -73,17 +73,17 @@ bool noxcain::GraphicEngine::run( std::shared_ptr<PresentationSurface> os_surfac
 
 vk::Device noxcain::GraphicEngine::get_device()
 {
-	return engine->core->getLogicalDevice();
+	return engine->core->get_logical_device();
 }
 
 vk::PhysicalDevice noxcain::GraphicEngine::get_physical_device()
 {
-	return engine->core->getPhysicalDevice();
+	return engine->core->get_physical_device();
 }
 
 vk::SwapchainKHR noxcain::GraphicEngine::get_swapchain()
 {
-	return engine->core->getSwapChain();
+	return engine->core->get_swapchain();
 }
 
 noxcain::UINT32 noxcain::GraphicEngine::get_swapchain_image_count()
@@ -93,12 +93,12 @@ noxcain::UINT32 noxcain::GraphicEngine::get_swapchain_image_count()
 
 vk::Format noxcain::GraphicEngine::get_swapchain_image_format()
 {
-	return engine->core->getPresentationSurfaceFormat();
+	return engine->core->get_presentation_surface_format();
 }
 
 vk::ImageView noxcain::GraphicEngine::get_swapchain_image_view( std::size_t image_index )
 {
-	return engine->core->getImageView( image_index );
+	return engine->core->get_image_view( image_index );
 }
 
 bool noxcain::GraphicEngine::recreate_swapchain( bool recreate_surface )

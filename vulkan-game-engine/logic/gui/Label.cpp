@@ -5,7 +5,7 @@
 #include <cmath>
 
 noxcain::VectorTextLabel2D::VectorTextLabel2D( GameUserInterface& ui ) :
-	text_content( ui.texts ), background( ui.labels ), frame( ui.labels )
+	text_content( ui.get_texts() ), background( ui.get_labels() ), frame( ui.get_labels() )
 {
 	std::function<DOUBLE()> size_getter = [this]() ->DOUBLE
 	{
@@ -16,6 +16,7 @@ noxcain::VectorTextLabel2D::VectorTextLabel2D( GameUserInterface& ui ) :
 	set_text_alignment( VerticalTextAlignments::BOTTOM );
 	set_text_alignment( HorizontalTextAlignments::LEFT );
 	set_auto_resize( AutoResizeModes::FULL );
+	hide();
 }
 
 void noxcain::VectorTextLabel2D::set_depth_level( UINT32 level )
@@ -176,7 +177,7 @@ void noxcain::VectorTextLabel2D::set_centered_icon( DOUBLE size, UINT32 unicode 
 		{
 			const DOUBLE font_size = get_text_element().get_size();
 			const BoundingBox icon_bounding_box = get_text_element().get_font().get_character_bounding_box( unicodes.front() );
-			return -font_size*icon_bounding_box.get_left() + 0.5*( background.get_width() - font_size*icon_bounding_box.get_width() );
+			return -font_size*icon_bounding_box.get_left()+0.5*( background.get_width() - font_size*icon_bounding_box.get_width() );
 		}
 		return 0.0;
 	};
@@ -191,7 +192,7 @@ void noxcain::VectorTextLabel2D::set_centered_icon( DOUBLE size, UINT32 unicode 
 			const auto& font = get_text_element().get_font();
 			const BoundingBox icon_bounding_box = font.get_character_bounding_box( unicodes.front() );
 			
-			return -font_size*( icon_bounding_box.get_bottom() - font.get_descender() ) + 0.5*( background.get_height() - font_size*icon_bounding_box.get_height() );
+			return -font_size*( icon_bounding_box.get_bottom() - font.get_descender() )+0.5*( background.get_height() - font_size*icon_bounding_box.get_height() );
 		}
 		return 0.0;
 	};

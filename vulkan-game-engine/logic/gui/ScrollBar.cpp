@@ -154,7 +154,7 @@ void noxcain::ScrollBarBase::fix_scale()
 }
 
 noxcain::ScrollBarBase::ScrollBarBase( DOUBLE frame_size, GameUserInterface& ui, RegionalEventExclusivTracer& tracer ): bar_endcap_size( frame_size ),
-	bar( ui.labels ), slider( ui ), scale_button_left_top( ui ), scale_button_right_bottom( ui ), drag_tracer( tracer )
+	bar( ui.get_labels() ), slider( ui ), scale_button_left_top( ui ), scale_button_right_bottom( ui ), drag_tracer( tracer )
 {
 	scale_button_left_top.get_area().set_top_anchor( slider_region );
 	scale_button_left_top.get_area().set_left_anchor( slider_region );

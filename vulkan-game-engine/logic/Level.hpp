@@ -157,7 +157,8 @@ namespace noxcain
 		//contains refs to the current randerable objects
 		RenderableContainer<GeometryObject> geometry_renderables;
 		RenderableContainer<VectorText3D> vector_decal_renderables;
-		UserInterfaceContainer user_interfaces;
+		void clear_user_interfaces();
+		void add_user_interface( GameUserInterface& new_interface );
 
 	private:
 		Status status = Status::STARTING;
@@ -172,6 +173,7 @@ namespace noxcain
 		RegionalEventRecieverNode::Stack interaction_children_stack;
 		RegionalEventRecieverNode::Stack interaction_miss_stack;
 		std::unique_ptr<PassivRecieverNode> ui_root;
+		UserInterfaceContainer user_interfaces;
 		RegionalEventExclusivTracer regional_exclusiv;
 		
 		/// <summary>

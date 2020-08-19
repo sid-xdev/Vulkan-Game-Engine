@@ -105,7 +105,7 @@ void noxcain::FontEngine::createUnicodeMap( ResourceFile& font_file, UINT32 offs
 			}
 			else
 			{
-				std::size_t count = format4.endCode[segIndex] - format4.startCode[segIndex] + 1;
+				std::size_t count = std::size_t(format4.endCode[segIndex]) - format4.startCode[segIndex] + 1;
 				for( std::size_t index = 0; index < count; ++index )
 				{
 					//get back from glyphId array to start of idRangeOffset array and then offset to current idRangOffset entry ( - segment count + segment id )
@@ -492,24 +492,38 @@ void noxcain::FontEngine::computeGlyph( ResourceFile& font_file, UINT32 tableOff
 
 			newGlyph.flags.insert( newGlyph.flags.end(), componentGlyph.flags.begin(), componentGlyph.flags.end() );
 
+			std::size_t corner_index = 4*(std::size_t)compositeGlyph.glyph_index;
+
 			for( UINT32 pointIndex = 0; pointIndex < componentGlyph.flags.size(); ++pointIndex )
 			{
-				DOUBLE valueX = component.transformation1*componentGlyph.xCoords[pointIndex] + component.transformation2*componentGlyph.yCoords[pointIndex] + offsetX;
-				DOUBLE valueY = component.transformation3*componentGlyph.xCoords[pointIndex] + component.transformation4*componentGlyph.yCoords[pointIndex] + offsetY;
+				DOUBLE value_x = component.transformation1*componentGlyph.xCoords[pointIndex] + component.transformation2*componentGlyph.yCoords[pointIndex] + offsetX;
+				DOUBLE value_y = component.transformation3*componentGlyph.xCoords[pointIndex] + component.transformation4*componentGlyph.yCoords[pointIndex] + offsetY;
 				if( component.flags & 0x0004 )
 				{
-					valueX = INT32( valueX + 0.5 );
-					valueY = INT32( valueY + 0.5 );
+					value_x = INT32( value_x + 0.5 );
+					value_y = INT32( value_y + 0.5 );
 				}
-				newGlyph.xCoords.push_back( valueX );
 
-				newGlyph.yCoords.push_back( valueY );
+				newGlyph.xCoords.push_back( value_x );
+				newGlyph.yCoords.push_back( value_y );
 			}
 		}
 	}
 
 	point_maps.resize( glyph_count );
 	offset_maps.resize( glyph_count );
+
+	auto check_corner_points = [this]( UINT32 glyph_index, const std::vector<FLOAT32>& curve_points )
+	{
+		std::size_t corner_index = 4*( std::size_t )glyph_index;
+		const FLOAT32& x_value = curve_points.back();
+		const FLOAT32& y_value = curve_points[curve_points.size() - 2];
+		if( x_value < glyph_corners[corner_index] ) glyph_corners[corner_index] = x_value;
+		else if( x_value > glyph_corners[corner_index+2] ) glyph_corners[corner_index+2] = x_value;
+
+		if( y_value < glyph_corners[corner_index+1] ) glyph_corners[corner_index+1] = y_value;
+		else if( y_value > glyph_corners[corner_index+3] ) glyph_corners[corner_index+3] = y_value;
+	};
 
 	//rebuild glyphs 2 map
 	for( UINT32 rawGlyphIndex = 0; rawGlyphIndex < rawGlyphs.size(); ++rawGlyphIndex )
@@ -521,6 +535,11 @@ void noxcain::FontEngine::computeGlyph( ResourceFile& font_file, UINT32 tableOff
 		UINT32 startIndex = 0;
 		curvePoints.reserve( 4 * glyph.flags.size() );
 
+		FLOAT32 min_x = glyph.xCoords[0]/units_per_em;
+		FLOAT32 max_x = glyph.xCoords[0]/units_per_em;
+		FLOAT32 min_y = glyph.yCoords[0]/units_per_em;
+		FLOAT32 max_y = glyph.yCoords[0]/units_per_em;
+
 		for( UINT16 endIndex : glyph.endPointIndices )
 		{
 			const UINT32 size = endIndex - startIndex + 1;
@@ -531,7 +550,7 @@ void noxcain::FontEngine::computeGlyph( ResourceFile& font_file, UINT32 tableOff
 			{	
 				UINT32 index = relIndex % size;
 				
-				FLOAT32 currPointX = glyph.xCoords[std::size_t(startIndex) + index] / units_per_em;
+				FLOAT32 currPointX = glyph.xCoords[std::size_t( startIndex ) + index] / units_per_em;
 				FLOAT32 currPointY = glyph.yCoords[std::size_t( startIndex ) + index] / units_per_em;
 
 				if( shouldOnCurve == bool( glyph.flags[std::size_t( startIndex ) + index] & 0x1 ) )
@@ -544,15 +563,30 @@ void noxcain::FontEngine::computeGlyph( ResourceFile& font_file, UINT32 tableOff
 					DOUBLE prevPointX = glyph.xCoords[std::size_t( startIndex ) + prevIndex] / units_per_em;
 					DOUBLE prevPointY = glyph.yCoords[std::size_t( startIndex ) + prevIndex] / units_per_em;
 
-					curvePoints.push_back( 0.5*( prevPointX + currPointX ) );
-					curvePoints.push_back( 0.5*( prevPointY + currPointY ) );
+					FLOAT32 middlePointX = 0.5*( prevPointX + currPointX );
+					FLOAT32 middlePointY = 0.5*( prevPointY + currPointY );
+
+					if( middlePointX < min_x ) min_x = middlePointX;
+					else if( middlePointX > max_x ) max_x = middlePointX;
+					curvePoints.push_back( middlePointX );
+
+					if( middlePointY < min_y ) min_y = middlePointY;
+					else if( middlePointY > max_y ) max_y = middlePointY;
+					curvePoints.push_back( middlePointY );
+					
 					++pointCount;
 				}
 				
 				if( relIndex < size || pointCount % 2 == 0 )
 				{
+					if( currPointX < min_x ) min_x = currPointX;
+					else if( currPointX > max_x ) max_x = currPointX;
 					curvePoints.push_back( currPointX );
+
+					if( currPointY < min_y ) min_y = currPointY;
+					else if( currPointY > max_y ) max_y = currPointY;
 					curvePoints.push_back( currPointY );
+
 					++pointCount;
 				}
 			}
@@ -564,6 +598,12 @@ void noxcain::FontEngine::computeGlyph( ResourceFile& font_file, UINT32 tableOff
 
 			startIndex = endIndex + 1;
 		}
+
+		std::size_t corner_index = 4*( std::size_t )rawGlyphIndex;
+		glyph_corners[corner_index] = min_x;
+		glyph_corners[corner_index+1] = min_y;
+		glyph_corners[corner_index+2] = max_x;
+		glyph_corners[corner_index+3] = max_y;
 
 		std::vector<Band> xBands( 32 );
 		std::array<UINT32, 2> xBandCounts = fillBand( curvePoints, curveStartOffsets, xBands, 0, &glyph_corners[std::size_t( 4 ) * rawGlyphIndex] );
@@ -777,10 +817,6 @@ void noxcain::FontEngine::readCompositeGlyph( ResourceFile& font_file )
 bool noxcain::FontEngine::readFont( const std::string& fontPath )
 {
 	std::ifstream file( fontPath );
-	if( file.is_open() )
-	{
-		int hug_me = 0;
-	}
 	ResourceFile font_file;
 	if( font_file.open( fontPath, false ) )
 	{

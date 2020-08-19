@@ -1,7 +1,7 @@
 #include "UserInterface.hpp"
 
 void noxcain::GameUserInterface::sort()
-{
+{	
 	bool sort_text = texts.sort( []( const VectorText2D& first, const VectorText2D& second ) ->bool
 	{
 		return first.get_depth_level() < second.get_depth_level();
@@ -33,7 +33,16 @@ void noxcain::GameUserInterface::sort()
 				text_count++;
 				text_iter++;
 			}
-			depth_order.emplace_back( std::array<UINT32, 2>( { label_count, text_count } ) );
+			depth_order.emplace_back( OrderEntry({ label_count, text_count }) );
 		}
 	}
+}
+
+void noxcain::GameUserInterface::set_regional_event_root( RegionalEventRecieverNode& node )
+{
+	if( regional_event_root )
+	{
+		regional_event_root->cut_branch();
+	}
+	regional_event_root = &node;
 }

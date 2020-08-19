@@ -19,56 +19,8 @@
 
 #include <cmath>
 
-void noxcain::MineSweeperLevel::create_settings()
+void noxcain::MineSweeperLevel::create_performance_hud()
 {
-	const auto settings = LogicEngine::get_graphic_settings();
-	/*
-	//exit button;
-	get_screen_root().add_branch( *exit_button );
-	exit_button->get_area().set_top_anchor( get_screen_root(), -5.0 );
-	exit_button->get_area().set_right_anchor( get_screen_root(), -5.0 );
-
-	exit_button->set_background_color( 1.0F, 1.0F, 1.0F );
-	exit_button->set_highlight_color( 0.5F, 0.5F, 0.5F );
-	exit_button->set_active_color( 0.0F, 0.0F, 0.0F );
-	exit_button->get_text_element().set_color( 0.0F, 0.0F, 0.0F );
-	exit_button->get_text_element().set_utf8( "X" );
-	exit_button->get_text_element().set_size( 24 );
-	exit_button->set_text_alignment( VectorTextLabel2D::VerticalTextAlignments::CENTER );
-	exit_button->set_text_alignment( VectorTextLabel2D::HorizontalTextAlignments::CENTER );
-	exit_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::HEIGHT );
-	exit_button->get_area().set_width( exit_button->get_area().get_height() );
-	exit_button->set_frame_size( 1 );
-	exit_button->set_frame_color( 0.0, 0.0, 0.0 );
-	*/
-	sampling_description_label->get_area().set_top_anchor( get_screen_root(), -20 );
-	sampling_description_label->get_area().set_left_anchor( get_screen_root(), 20 );
-
-	sampling_description_label->set_background_color( 0.5, 0.5, 0.5, 1.0 );
-	sampling_description_label->get_text_element().set_size( 24 );
-	sampling_description_label->get_text_element().set_utf8( "AntiAlaising" );
-}
-
-noxcain::MineSweeperLevel::MineSweeperLevel() :
-	//fieldOrientationSpline( std::make_unique<CubicSpline>() ),
-	cpu_cycle_label( std::make_unique<VectorText2D>( default_ui.texts ) ),
-	gpu_cycle_label( std::make_unique<VectorText2D>( default_ui.texts ) ),
-	debug_button( std::make_unique<BaseButton>( default_ui ) ),
-	switch_font_button( std::make_unique<BaseButton>( default_ui ) ),
-	exit_button( std::make_unique<BaseButton>( default_ui ) ),
-
-	sampling_description_label( std::make_unique<VectorTextLabel2D>( settings_ui ) ),
-	sampling_description_value( std::make_unique<VectorTextLabel2D>( settings_ui ) ),
-	sampling_decrease_button( std::make_unique<BaseButton>( settings_ui ) ),
-	sampling_increase_button( std::make_unique<BaseButton>( settings_ui ) )
-{
-	time_collector.name_collection( "Level logic" );
-
-	vector_decal_renderables.emplace_back( vector_dacal_list );
-	geometry_renderables.emplace_back( geometry_list );
-
-	user_interfaces.emplace_back( default_ui );
-
 	//fps displays
 	cpu_cycle_label->set_top_anchor( get_screen_root() );
 	gpu_cycle_label->set_vertical_anchor( VerticalAnchorType::TOP, *cpu_cycle_label, VerticalAnchorType::BOTTOM );
@@ -79,33 +31,10 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 	cpu_cycle_label->get_text().set_size( 24 );
 	gpu_cycle_label->get_text().set_size( 24 );
 
-	setup_events();
-	grid = std::make_unique<SceneGraphNode>();
-	get_scene_root().add_branch( *grid );
-
-	setup_level();
-
-	//exit button;
-	get_screen_root().add_branch( *exit_button );
-	exit_button->get_area().set_top_anchor( get_screen_root(), -10.0 );
-	exit_button->get_area().set_right_anchor( get_screen_root(), -10.0 );
-	exit_button->get_text_element().set_font_id( 2 );
-	exit_button->set_auto_resize();
-	exit_button->get_text_element().set_size( 45 );
-	exit_button->get_text_element().set_unicodes( { 0xF335 } );
-	//exit_button->set_centered_icon( 45, 61696 );
-
-	exit_button->set_down_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
-	{
-		set_status( Status::FINISHED );
-		return true;
-	} );
-#ifndef __ANDROID__
-	exit_button->show();
-#endif
+	cpu_cycle_label->show();
+	gpu_cycle_label->show();
 
 	// add debug button
-	get_screen_root().add_branch( *debug_button );
 	debug_button->get_area().set_vertical_anchor( VerticalAnchorType::TOP, *switch_font_button, VerticalAnchorType::BOTTOM, -5 );
 	debug_button->get_area().set_left_anchor( get_screen_root(), 5 );
 	debug_button->get_area().set_width( 100 );
@@ -124,7 +53,6 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 	debug_button->show();
 
 	// add switch Font Button
-	get_screen_root().add_branch( *switch_font_button );
 	switch_font_button->get_area().set_vertical_anchor( VerticalAnchorType::TOP, *gpu_cycle_label, VerticalAnchorType::BOTTOM, -5 );
 	switch_font_button->get_area().set_left_anchor( get_screen_root(), 5 );
 	switch_font_button->get_area().set_width( 100 );
@@ -135,7 +63,7 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 
 	switch_font_button->set_click_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
 	{
-		
+
 		if( !hex_fields.empty() )
 		{
 			std::size_t next_font_id = ( hex_fields.front()->get_font_id() + 1 ) % ResourceEngine::get_engine().get_invalid_font_id();
@@ -146,10 +74,187 @@ noxcain::MineSweeperLevel::MineSweeperLevel() :
 		}
 		return true;
 	} );
-
 	switch_font_button->show();
 
-	create_settings();
+	performance_ui_base->set_top_anchor( *switch_font_button );
+	performance_ui_base->set_bottom_anchor( *debug_button );
+	performance_ui_base->set_left_anchor( *switch_font_button );
+	performance_ui_base->set_right_anchor( *switch_font_button );
+
+	performance_ui_base->add_branch( *debug_button );
+	performance_ui_base->add_branch( *switch_font_button );
+
+	performance_ui.set_regional_event_root( *performance_ui_base );
+}
+
+void noxcain::MineSweeperLevel::create_default_hud()
+{
+	//exit button;
+	exit_button->get_area().set_top_anchor( get_screen_root(), -10.0 );
+	exit_button->get_area().set_right_anchor( get_screen_root(), -10.0 );
+	exit_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::NONE );
+#ifndef __ANDROID__
+	exit_button->get_area().set_size( 49, 49 );
+	exit_button->get_text_element().set_font_id( 2 );
+	exit_button->set_centered_icon( 50, 0xF335 );
+
+	exit_button->set_down_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
+	{
+		set_status( Status::FINISHED );
+		return true;
+	} );
+
+	exit_button->show();
+#endif
+
+	//config button;
+	config_button->get_area().set_top_anchor( get_screen_root(), -10.0 );
+	config_button->get_area().set_horizontal_anchor( HorizontalAnchorType::RIGHT, *exit_button, HorizontalAnchorType::LEFT, -5.0 );
+	config_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::NONE );
+	config_button->get_area().set_size( 49, 49 );
+	config_button->get_text_element().set_font_id( 2 );
+	config_button->set_centered_icon( 35, 0xF111 );
+
+	config_button->set_down_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
+	{
+		display_settings();
+		return true;
+	} );
+	config_button->show();
+
+	default_ui_base->set_bottom_anchor( *config_button );
+	default_ui_base->set_top_anchor( *config_button );
+	default_ui_base->set_left_anchor( *config_button );
+	default_ui_base->set_right_anchor( *exit_button );
+
+	default_ui_base->add_branch( *config_button );
+	default_ui_base->add_branch( *exit_button );
+
+	default_ui.set_regional_event_root( *default_ui_base );
+}
+
+void noxcain::MineSweeperLevel::create_settings_hud()
+{
+	DOUBLE main_size = 24;
+
+	sampling_description_label->get_area().set_top_anchor( get_screen_root(), -20 );
+	sampling_description_label->get_area().set_left_anchor( get_screen_root(), 20 );
+	sampling_description_label->get_text_element().set_size( main_size );
+	sampling_description_label->get_text_element().set_utf8( "ANTI-ALIASING" );
+	sampling_description_label->show();
+
+	sampling_decrease_button->get_area().set_bottom_anchor( *sampling_description_label );
+	sampling_decrease_button->get_area().set_top_anchor( *sampling_description_label );
+	sampling_decrease_button->get_area().set_horizontal_anchor( HorizontalAnchorType::LEFT, *sampling_description_label, HorizontalAnchorType::RIGHT, 0.5*main_size );
+	sampling_decrease_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::NONE );
+	sampling_decrease_button->get_area().set_width( [this]()
+	{
+		return sampling_decrease_button->get_area().get_height();
+	} );
+	sampling_decrease_button->set_centered_icon( 24, 0x2212 );
+	sampling_decrease_button->show();
+	sampling_decrease_button->set_click_handler( [this]( const RegionalKeyEvent& regional_event, BaseButton& event_reciever ) -> bool
+	{
+		auto settings = LogicEngine::get_graphic_settings();
+		if( 1 )//settings.current_sample_count > 1 )
+		{
+			++settings.current_sample_count;
+		}
+
+		if( settings.current_sample_count <= 1 )
+		{
+			//event_reciever.deactivate();
+		}
+
+		if( settings.current_sample_count < settings.max_sample_count )
+		{
+			sampling_increase_button->activate();
+		}
+
+		LogicEngine::set_graphic_settings( settings.current_sample_count, settings.current_super_sampling_factor, settings.current_resolution.width, settings.current_resolution.height );
+		return true;
+	} );
+
+	sampling_description_value->get_area().set_bottom_anchor( *sampling_decrease_button );
+	sampling_description_value->get_area().set_top_anchor( *sampling_decrease_button );
+	sampling_description_value->get_area().set_horizontal_anchor( HorizontalAnchorType::LEFT, *sampling_decrease_button, HorizontalAnchorType::RIGHT, 0.5*main_size );
+	sampling_description_value->get_area().set_width( 2.0 * main_size * 1.4 );
+	sampling_description_value->set_background_color( 0.2, 0.2, 0.2, 1.0 );
+	sampling_description_value->get_text_element().set_size( main_size );
+	sampling_description_value->set_text_alignment( VectorTextLabel2D::HorizontalTextAlignments::CENTER );
+	sampling_description_value->set_auto_resize( VectorTextLabel2D::AutoResizeModes::NONE );
+	
+	sampling_description_value->show();
+
+	sampling_increase_button->get_area().set_bottom_anchor( *sampling_description_label );
+	sampling_increase_button->get_area().set_horizontal_anchor( HorizontalAnchorType::LEFT, *sampling_description_value, HorizontalAnchorType::RIGHT, 0.5*main_size );
+	sampling_increase_button->set_auto_resize( VectorTextLabel2D::AutoResizeModes::NONE );
+	sampling_increase_button->get_area().set_size( main_size * 1.4, main_size * 1.4 );
+	sampling_increase_button->set_centered_icon( 24, 0x2B );
+	sampling_increase_button->show();
+
+	settings_background->set_left_anchor( *sampling_description_label );
+	settings_background->set_right_anchor( *sampling_increase_button );
+	settings_background->set_top_anchor( *sampling_description_label );
+	settings_background->set_bottom_anchor( *sampling_description_label );
+
+	settings_background->add_branch( *sampling_decrease_button );
+	settings_background->add_branch( *sampling_increase_button );
+
+	settings_ui.set_regional_event_root( *settings_background );
+}
+
+void noxcain::MineSweeperLevel::display_settings()
+{
+	clear_user_interfaces();
+	add_user_interface( settings_ui );
+	add_user_interface( default_ui );
+
+	const auto settings = LogicEngine::get_graphic_settings();
+	sampling_description_value->get_text_element().set_utf8( std::to_string( settings.current_sample_count ) + "x" );
+
+	//if( settings.current_sample_count <= 1 ) sampling_decrease_button->deactivate();
+	//else sampling_decrease_button->activate();
+
+	if( settings.current_sample_count >= settings.max_sample_count ) sampling_increase_button->deactivate();
+	else sampling_increase_button->activate();
+}
+
+noxcain::MineSweeperLevel::MineSweeperLevel() :
+	//fieldOrientationSpline( std::make_unique<CubicSpline>() ),
+	performance_ui_base( std::make_unique<PassivRecieverNode>() ),
+	cpu_cycle_label( std::make_unique<VectorText2D>( performance_ui.get_texts() ) ),
+	gpu_cycle_label( std::make_unique<VectorText2D>( performance_ui.get_texts() ) ),
+	debug_button( std::make_unique<BaseButton>( performance_ui ) ),
+	switch_font_button( std::make_unique<BaseButton>( performance_ui ) ),
+	
+	default_ui_base( std::make_unique<PassivRecieverNode>() ),
+	exit_button( std::make_unique<BaseButton>( default_ui ) ),
+	config_button( std::make_unique<BaseButton>( default_ui ) ),
+
+	settings_background( std::make_unique<PassivRecieverNode>() ),
+	sampling_description_label( std::make_unique<VectorTextLabel2D>( settings_ui ) ),
+	sampling_description_value( std::make_unique<VectorTextLabel2D>( settings_ui ) ),
+	sampling_decrease_button( std::make_unique<BaseButton>( settings_ui ) ),
+	sampling_increase_button( std::make_unique<BaseButton>( settings_ui ) )
+{
+	time_collector.name_collection( "Level logic" );
+
+	vector_decal_renderables.emplace_back( vector_dacal_list );
+	geometry_renderables.emplace_back( geometry_list );
+
+	setup_events();
+	grid = std::make_unique<SceneGraphNode>();
+	get_scene_root().add_branch( *grid );
+
+	setup_level();
+
+	create_default_hud();
+	create_performance_hud();
+	create_settings_hud();
+
+	add_user_interface( default_ui );
+	add_user_interface( performance_ui );
 }
 
 noxcain::MineSweeperLevel::~MineSweeperLevel()

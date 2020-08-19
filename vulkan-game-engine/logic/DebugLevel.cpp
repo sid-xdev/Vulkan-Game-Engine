@@ -32,7 +32,7 @@ void noxcain::DebugLevel::initialize()
 	tooltip->set_depth_level( 30 );
 	tooltip->hide();
 
-	background = std::make_unique<PassivColorLabel>( ui.labels );
+	background = std::make_unique<PassivColorLabel>( ui.get_labels() );
 	background->set_top_anchor( get_screen_root(), -LABEL_DISTANCE );
 	background->set_left_anchor( get_screen_root(), LABEL_DISTANCE );
 	background->set_right_anchor( get_screen_root(), -LABEL_DISTANCE );
@@ -115,7 +115,7 @@ void noxcain::DebugLevel::initialize()
 	scroll_bar->set_position( 1.0 );
 	scroll_bar->show();
 
-	get_screen_root().add_branch( *background );
+	ui.set_regional_event_root( *background );
 	background->add_branch( *exit_button );
 	background->add_branch( *scroll_bar );
 
@@ -190,7 +190,7 @@ void noxcain::DebugLevel::update_level_logic( const std::chrono::nanoseconds& de
 
 noxcain::DebugLevel::DebugLevel() : exit_button( std::make_unique<BaseButton>( ui ) )
 {
-	user_interfaces.emplace_back( ui );
+	add_user_interface( ui );
 }
 
 noxcain::DebugLevel::~DebugLevel()
@@ -232,7 +232,7 @@ bool noxcain::DebugLevel::on()
 }
 
 noxcain::DebugLevel::TimeFrameLabel::TimeFrameLabel( DebugLevel& level ) : 
-	frame( level.ui.labels ), background( level.ui.labels ), text( level.ui.texts ), tooltip( *level.tooltip )
+	frame( level.ui.get_labels() ), background( level.ui.get_labels() ), text( level.ui.get_texts() ), tooltip( *level.tooltip )
 {
 	background.set_same_region( frame, LABEL_FRAME_WIDTH, LABEL_FRAME_WIDTH );
 

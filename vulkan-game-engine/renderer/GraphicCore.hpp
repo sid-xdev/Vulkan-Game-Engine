@@ -40,9 +40,9 @@ namespace noxcain
 
 		std::vector<vk::ImageView> swapChainImageViews;
 
-		bool pickPhysicalDevice();
-		bool createDevice();
-		bool createSwapchain( const vk::SwapchainKHR& oldSwapChain = vk::SwapchainKHR() );
+		bool pick_physical_device();
+		bool create_device();
+		bool create_swapchain( const vk::SwapchainKHR& oldSwapChain = vk::SwapchainKHR() );
 
 	public:
 
@@ -54,19 +54,19 @@ namespace noxcain
 		bool initialize( std::shared_ptr<PresentationSurface> os_surface );
 		~GraphicCore();
 
-		bool switchToNextPhysicalDevice();
+		bool use_next_physical_device();
 
 		UINT32 get_graphic_queue_family_index() const;
 		UINT32 get_swapchain_image_count() const;
 
 		vk::Extent2D get_window_extent() const;
-		vk::Format getPresentationSurfaceFormat() const;
+		vk::Format get_presentation_surface_format() const;
 
-		vk::PhysicalDevice getPhysicalDevice() const;
-		vk::Device getLogicalDevice() const;
-		vk::SurfaceKHR getSurface() const;
-		vk::SwapchainKHR getSwapChain() const;
-		vk::ImageView getImageView( UINT32 index ) const;
+		vk::PhysicalDevice get_physical_device() const;
+		vk::Device get_logical_device() const;
+		vk::SurfaceKHR get_surface() const;
+		vk::SwapchainKHR get_swapchain() const;
+		vk::ImageView get_image_view( UINT32 index ) const;
 
 		void close_surface_base() const;
 		bool recreate_swapchain( bool recreate_surface );
