@@ -13,10 +13,10 @@ namespace noxcain
 
 		std::shared_ptr<PresentationSurface> surface_base = nullptr;
 
-		vk::Extent2D surfaceExtent;
-		vk::Format surfaceFormat = vk::Format::eUndefined;
+		vk::Extent2D surface_extent;
+		vk::Format surface_format = vk::Format::eUndefined;
 		
-		UINT32 presentationImageCount = 3;
+		UINT32 presentation_image_count = 3;
 		vk::PresentModeKHR presentationMode = vk::PresentModeKHR::eFifoRelaxed;
 
 		std::vector<const char*> necessary_instance_extensions = { VK_KHR_SURFACE_EXTENSION_NAME };
@@ -26,7 +26,7 @@ namespace noxcain
 		vk::Device logical_device;
 
 		vk::SurfaceKHR surface;
-		vk::SwapchainKHR swapChain;
+		vk::SwapchainKHR swapchain;
 
 		UINT32 deviceIndex = 0;
 		struct PhysicalDeviceCandidate
@@ -42,7 +42,7 @@ namespace noxcain
 
 		bool pick_physical_device();
 		bool create_device();
-		bool create_swapchain( const vk::SwapchainKHR& oldSwapChain = vk::SwapchainKHR() );
+		bool create_swapchain( vk::SwapchainKHR oldSwapChain = vk::SwapchainKHR() );
 
 	public:
 
@@ -69,6 +69,7 @@ namespace noxcain
 		vk::ImageView get_image_view( UINT32 index ) const;
 
 		void close_surface_base() const;
-		bool recreate_swapchain( bool recreate_surface );
+		bool signal_swapchain_recreation( bool recreate_surface );
+		bool execute_swapchain_recreation( bool recreate_surface );
 	};
 }

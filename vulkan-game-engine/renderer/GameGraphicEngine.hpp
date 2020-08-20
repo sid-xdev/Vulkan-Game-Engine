@@ -29,10 +29,6 @@ namespace noxcain
 		
 		bool clear();
 		void initialize();
-		
-		//bool checkGraphicProperties();
-
-		//void recreateRenderLoop( bool keepSwapChain );
 
 		GraphicEngine( const GraphicEngine& ) = delete;
 		GraphicEngine& operator=( const GraphicEngine& ) = delete;
@@ -49,7 +45,9 @@ namespace noxcain
 		static UINT32 get_swapchain_image_count();
 		static vk::Format get_swapchain_image_format();
 		static vk::ImageView get_swapchain_image_view( std::size_t image_index );
-		static bool recreate_swapchain( bool recreate_surface );
+		
+		static bool execute_swapchain_recreation( bool recreate_surface );
+		static bool signal_swapchain_recreation( bool recreate_surface );
 		
 		static MemoryManager& get_memory_manager();
 

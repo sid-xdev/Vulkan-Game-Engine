@@ -3,7 +3,7 @@
 #include <ResourceFile.hpp>
 #include <Windows.h>
 #include <string>
-#include <thread>
+#include <condition_variable>
 #include <mutex>
 #include <fstream>
 
@@ -60,6 +60,11 @@ namespace noxcain
 	{
 	private:
 		friend class WindowClass;
+
+		enum class CustomMessages : UINT
+		{
+			NXCM_RECREATE_SWAPCHAIN = WM_USER
+		};
 		
 		std::shared_ptr<WindowClass> window_class;
 		HWND window_handle = NULL;
@@ -91,6 +96,15 @@ namespace noxcain
 		/// </summary>
 		static BOOL display_callback( HMONITOR monitor, HDC device_context, LPRECT rectangle, LPARAM app_parameter );
 
+		/// <summary>
+		/// recreate swapchain when needed but only when client area valid
+		/// </summary>
+		bool is_resizing = false;
+		bool is_invalid_size = false;
+		bool swapchain_needed = false;
+		bool recreate_surface = false;
+		void check_swapchain_status();
+
 	public:
 		/// <summary>
 		/// Create window and start processing message queue.
@@ -100,9 +114,11 @@ namespace noxcain
 
 		vk::SurfaceKHR create_surface( const vk::Instance& instance ) override;
 		void add_surface_extension( std::vector<const char*>& extensions ) const override;
+		
 		void close() const override;
 		explicit operator bool() const override;
 		bool window_changed() const override;
+		void recreate_swapchain( bool recreate_surface ) const override;
 		
 		Window( std::shared_ptr<WindowClass> window_class );
 

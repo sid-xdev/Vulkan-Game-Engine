@@ -101,9 +101,14 @@ vk::ImageView noxcain::GraphicEngine::get_swapchain_image_view( std::size_t imag
 	return engine->core->get_image_view( image_index );
 }
 
-bool noxcain::GraphicEngine::recreate_swapchain( bool recreate_surface )
+bool noxcain::GraphicEngine::execute_swapchain_recreation( bool recreate_surface )
 {
-	return engine->core->recreate_swapchain( recreate_surface );
+	return engine->core->execute_swapchain_recreation( recreate_surface );
+}
+
+bool noxcain::GraphicEngine::signal_swapchain_recreation( bool recreate_surface )
+{
+	return engine->core->signal_swapchain_recreation( recreate_surface );
 }
 
 noxcain::MemoryManager& noxcain::GraphicEngine::get_memory_manager()

@@ -101,15 +101,19 @@ bool noxcain::GraphicCore::create_device()
 	return r_handler.all_okay();
 }
 
-bool noxcain::GraphicCore::create_swapchain( const vk::SwapchainKHR& oldSwapChain )
+bool noxcain::GraphicCore::create_swapchain( vk::SwapchainKHR old_swapchain )
 {
 	ResultHandler r_handler( vk::Result::eSuccess );
 	const vk::PhysicalDevice& physicalDevice = candidates[deviceIndex].device;
-	
-	if( surface_base->window_changed() || !surface )
+
+	if( !surface )
 	{
-		instance.destroySurfaceKHR( surface );
 		surface = surface_base->create_surface( instance );
+		if( !( r_handler << physicalDevice.getSurfaceSupportKHR( get_graphic_queue_family_index(), surface ) ) || r_handler.is_critical() )
+		{
+			instance.destroySurfaceKHR( surface );
+			surface = vk::SurfaceKHR();
+		}
 	}
 
 	if( surface )
@@ -138,22 +142,22 @@ bool noxcain::GraphicCore::create_swapchain( const vk::SwapchainKHR& oldSwapChai
 		}
 
 		const vk::SurfaceCapabilitiesKHR& surfaceCapabilities = r_handler << physicalDevice.getSurfaceCapabilitiesKHR( surface );
-		if( presentationMode != vk::PresentModeKHR::eMailbox ) presentationImageCount = 2;
-		if( presentationImageCount < surfaceCapabilities.minImageCount ) presentationImageCount = surfaceCapabilities.minImageCount;
-		if( surfaceCapabilities.maxImageCount && presentationImageCount > surfaceCapabilities.maxImageCount ) presentationImageCount = surfaceCapabilities.maxImageCount;
+		if( presentationMode != vk::PresentModeKHR::eMailbox ) presentation_image_count = 2;
+		if( presentation_image_count < surfaceCapabilities.minImageCount ) presentation_image_count = surfaceCapabilities.minImageCount;
+		if( surfaceCapabilities.maxImageCount && presentation_image_count > surfaceCapabilities.maxImageCount ) presentation_image_count = surfaceCapabilities.maxImageCount;
 
 		const std::vector<vk::SurfaceFormatKHR>& surfaceFormates = r_handler << physicalDevice.getSurfaceFormatsKHR( surface );
 
-		surfaceExtent = surfaceCapabilities.currentExtent;
-		surfaceFormat = surfaceFormates[0].format;
+		surface_extent = surfaceCapabilities.currentExtent;
+		surface_format = surfaceFormates[0].format;
 
-		swapChain = r_handler << logical_device.createSwapchainKHR( vk::SwapchainCreateInfoKHR(
+		swapchain = r_handler << logical_device.createSwapchainKHR( vk::SwapchainCreateInfoKHR(
 			vk::SwapchainCreateFlagsKHR(),
 			surface,
-			presentationImageCount,
-			surfaceFormat,
+			presentation_image_count,
+			surface_format,
 			surfaceFormates[0].colorSpace,
-			surfaceExtent,
+			surface_extent,
 			1,
 			vk::ImageUsageFlagBits::eColorAttachment,
 			vk::SharingMode::eExclusive,
@@ -162,11 +166,12 @@ bool noxcain::GraphicCore::create_swapchain( const vk::SwapchainKHR& oldSwapChai
 			vk::CompositeAlphaFlagBitsKHR::eOpaque,
 			presentationMode,
 			VK_FALSE,
-			oldSwapChain ) );
+			old_swapchain ) );
+		logical_device.destroySwapchainKHR( old_swapchain );
 
 		if( r_handler.all_okay() )
 		{
-			std::vector<vk::Image> swapChainImages = r_handler << logical_device.getSwapchainImagesKHR( swapChain );
+			std::vector<vk::Image> swapChainImages = r_handler << logical_device.getSwapchainImagesKHR( swapchain );
 			swapChainImageViews.resize( swapChainImages.size() );
 			for( UINT32 swapChainImageIndex = 0; swapChainImageIndex < swapChainImages.size(); ++swapChainImageIndex )
 			{
@@ -239,7 +244,7 @@ bool noxcain::GraphicCore::initialize( std::shared_ptr<PresentationSurface> os_s
 			{
 				if( pick_physical_device() && 
 					create_device() && 
-					create_swapchain( swapChain ) )
+					create_swapchain( swapchain ) )
 				{
 					return true;
 				}
@@ -258,7 +263,7 @@ noxcain::GraphicCore::~GraphicCore()
 			logical_device.destroyImageView( imageView );
 		}
 
-		logical_device.destroySwapchainKHR( swapChain );
+		logical_device.destroySwapchainKHR( swapchain );
 		logical_device.destroy();
 	}
 
@@ -271,26 +276,30 @@ noxcain::GraphicCore::~GraphicCore()
 
 bool noxcain::GraphicCore::use_next_physical_device()
 {
-	if( logical_device )
+	do
 	{
-		for( const vk::ImageView& imageView : swapChainImageViews )
+		if( logical_device )
 		{
-			logical_device.destroyImageView( imageView );
+			for( const vk::ImageView& imageView : swapChainImageViews )
+			{
+				logical_device.destroyImageView( imageView );
+			}
+			swapChainImageViews.clear();
+
+			logical_device.destroySwapchainKHR( swapchain );
+			swapchain = vk::SwapchainKHR();
+
+			logical_device.destroy();
+			logical_device = vk::Device();
 		}
-		swapChainImageViews.clear();
 
-		logical_device.destroySwapchainKHR( swapChain );
-		logical_device.destroy();
-		logical_device = vk::Device();
+		++deviceIndex;
+		if( !( deviceIndex < candidates.size() ) )
+		{
+			return false;
+		}
 	}
-
-	++deviceIndex;
-	if( !( deviceIndex < candidates.size() ) )
-	{
-		return false;
-	}
-
-	create_device();
+	while( !create_device() || !create_swapchain( swapchain ) );
 	return true;
 }
 
@@ -306,12 +315,12 @@ noxcain::UINT32 noxcain::GraphicCore::get_swapchain_image_count() const
 
 vk::Extent2D noxcain::GraphicCore::get_window_extent() const
 {
-	return surfaceExtent;
+	return surface_extent;
 }
 
 vk::Format noxcain::GraphicCore::get_presentation_surface_format() const
 {
-	return surfaceFormat;
+	return surface_format;
 }
 
 vk::PhysicalDevice noxcain::GraphicCore::get_physical_device() const
@@ -331,7 +340,7 @@ vk::SurfaceKHR noxcain::GraphicCore::get_surface() const
 
 vk::SwapchainKHR noxcain::GraphicCore::get_swapchain() const
 {
-	return swapChain;
+	return swapchain;
 }
 
 vk::ImageView noxcain::GraphicCore::get_image_view( UINT32 index ) const
@@ -347,8 +356,10 @@ void noxcain::GraphicCore::close_surface_base() const
 	}
 }
 
-bool noxcain::GraphicCore::recreate_swapchain( bool recreate_surface )
+bool noxcain::GraphicCore::signal_swapchain_recreation( bool recreate_surface )
 {
+	recreate_surface = recreate_surface || surface_base->window_changed();
+	
 	for( const vk::ImageView& imageView : swapChainImageViews )
 	{
 		logical_device.destroyImageView( imageView );
@@ -357,14 +368,17 @@ bool noxcain::GraphicCore::recreate_swapchain( bool recreate_surface )
 
 	if( recreate_surface )
 	{
+		logical_device.destroySwapchainKHR( swapchain );
+		swapchain = vk::SwapchainKHR();
 		instance.destroy( surface );
 		surface = vk::SurfaceKHR();
 	}
 
-	vk::SwapchainKHR oldSwapChain = swapChain;
+	surface_base->recreate_swapchain( recreate_surface );
+	return true;
+}
 
-	bool result = create_swapchain( recreate_surface ? vk::SwapchainKHR() : oldSwapChain );
-
-	logical_device.destroySwapchainKHR( oldSwapChain );
-	return result;
+bool noxcain::GraphicCore::execute_swapchain_recreation( bool recreate_surface )
+{
+	return create_swapchain( recreate_surface ? vk::SwapchainKHR() : swapchain );
 }

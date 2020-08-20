@@ -50,7 +50,7 @@ void noxcain::CommandManager::run_render_loop()
 
 	CommandSubmit submit;
 
-	while( LogicEngine::is_running() && submit.check_swapchain() )
+	while( submit.check_swapchain() && LogicEngine::is_running() )
 	{
 		r_handle_bool.reset();
 		const auto start_time = std::chrono::steady_clock::now();
@@ -58,7 +58,10 @@ void noxcain::CommandManager::run_render_loop()
 		// and with out dependencie to command buffers
 		{
 			TimeFrame time_frame( record_time_frame, 0.0, 0.8, 0.0, 1.0, "pre buffer" );
+			
+			//trigger logic update in logic thread
 			LogicEngine::update();
+			
 			if( !validate_render_passes() )
 			{
 				//TODO error?
@@ -647,9 +650,9 @@ void noxcain::CommandManager::prepare_main_loop()
 	//TODO destroy temp host objects?
 
 	const vk::Device device = master.core->get_logical_device();
-	const vk::SwapchainKHR swapChain = master.core->get_swapchain();
+	const vk::SwapchainKHR swapchain = master.core->get_swapchain();
 	const std::vector<vk::Image> images;
-	const auto& swapChainReturn = device.getSwapchainImagesKHR( swapChain );
+	const auto& swapChainReturn = device.getSwapchainImagesKHR( swapchain );
 	const std::size_t nImages = swapChainReturn.value.size();
 
 	acquire_semaphores.resize( nImages );

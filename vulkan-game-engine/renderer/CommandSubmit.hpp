@@ -40,11 +40,13 @@ namespace noxcain
 			EXIT
 		} status = Status::SUBMIT;
 
+		bool running() const;
+
 		bool lost_surface = false;
-		void recreate_swapchain( bool recreate_surface );
+		void signal_swapchain_recreation( bool recreate_surface );
 
 		UINT32 submit_loop();
-		std::mutex submit_mutex;
+		mutable std::mutex submit_mutex;
 		std::thread submit_thread;
 		std::condition_variable submit_condition;
 

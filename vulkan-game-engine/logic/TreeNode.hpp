@@ -33,19 +33,20 @@ namespace noxcain
 	template<typename T>
 	inline void TreeNode<T>::collapse_branch()
 	{
+		T* saved_parent = nullptr;
 		if( parent )
 		{
-			T* saved_parent = parent;
+			saved_parent = parent;
 			parent->children.remove_if( [this]( const T& element )
 			{
 				return this == &element;
 			} );
-			parent = nullptr;
+			parent = nullptr;	
+		}
 
-			for( T& child : children )
-			{
-				child.parent = saved_parent;
-			}
+		for( T& child : children )
+		{
+			child.parent = saved_parent;
 		}
 		children.clear();
 	}

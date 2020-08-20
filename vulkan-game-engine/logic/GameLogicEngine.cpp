@@ -190,7 +190,6 @@ void noxcain::LogicEngine::update()
 		engine->status = Status::UPDATING;
 		engine->status_condition.notify_all();
 	}
-
 }
 
 void noxcain::LogicEngine::finish()
@@ -232,7 +231,7 @@ bool noxcain::LogicEngine::is_running()
 	{
 		engine->status_condition.wait( lock, []() -> bool
 		{
-			return ( engine->status != Status::PAUSED || engine->status == Status::EXIT );
+			return ( engine->status != Status::PAUSED );
 		} );
 	}
 	return engine->status != Status::EXIT;

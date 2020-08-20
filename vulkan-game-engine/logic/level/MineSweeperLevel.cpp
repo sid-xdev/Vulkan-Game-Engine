@@ -115,11 +115,24 @@ void noxcain::MineSweeperLevel::create_default_hud()
 	config_button->get_text_element().set_font_id( 2 );
 	config_button->set_centered_icon( 35, 0xF111 );
 
-	config_button->set_down_handler( [this]( const RegionalKeyEvent&, BaseButton& ) -> bool
+	config_button->set_click_handler( [this]( const RegionalKeyEvent& event , BaseButton& button ) -> bool
 	{
-		display_settings();
+		constexpr UINT32 gear_symbole = 0xF111;
+		constexpr UINT32 arrow_symbole = 0xF171;
+		if( button.get_text_element().get_unicodes().front() == gear_symbole )
+		{
+			display_settings();
+			button.set_centered_icon( 35, arrow_symbole );
+		}
+		else
+		{
+			clear_user_interfaces();
+			add_user_interface( performance_ui );
+			add_user_interface( default_ui );
+			button.set_centered_icon( 35, gear_symbole );
+		}
 		return true;
-	} );
+	});
 	config_button->show();
 
 	default_ui_base->set_bottom_anchor( *config_button );
@@ -156,14 +169,14 @@ void noxcain::MineSweeperLevel::create_settings_hud()
 	sampling_decrease_button->set_click_handler( [this]( const RegionalKeyEvent& regional_event, BaseButton& event_reciever ) -> bool
 	{
 		auto settings = LogicEngine::get_graphic_settings();
-		if( 1 )//settings.current_sample_count > 1 )
+		if( settings.current_sample_count > 1 )
 		{
-			++settings.current_sample_count;
+			--settings.current_sample_count;
 		}
 
 		if( settings.current_sample_count <= 1 )
 		{
-			//event_reciever.deactivate();
+			event_reciever.deactivate();
 		}
 
 		if( settings.current_sample_count < settings.max_sample_count )
@@ -192,6 +205,27 @@ void noxcain::MineSweeperLevel::create_settings_hud()
 	sampling_increase_button->get_area().set_size( main_size * 1.4, main_size * 1.4 );
 	sampling_increase_button->set_centered_icon( 24, 0x2B );
 	sampling_increase_button->show();
+	sampling_increase_button->set_click_handler( [this]( const RegionalKeyEvent& regional_event, BaseButton& event_reciever ) -> bool
+	{
+		auto settings = LogicEngine::get_graphic_settings();
+		if( settings.current_sample_count < settings.max_sample_count )
+		{
+			++settings.current_sample_count;
+		}
+
+		if( settings.current_sample_count >= settings.max_sample_count )
+		{
+			event_reciever.deactivate();
+		}
+
+		if( settings.current_sample_count > 1 )
+		{
+			sampling_decrease_button->activate();
+		}
+
+		LogicEngine::set_graphic_settings( settings.current_sample_count, settings.current_super_sampling_factor, settings.current_resolution.width, settings.current_resolution.height );
+		return true;
+	} );
 
 	settings_background->set_left_anchor( *sampling_description_label );
 	settings_background->set_right_anchor( *sampling_increase_button );
@@ -213,8 +247,8 @@ void noxcain::MineSweeperLevel::display_settings()
 	const auto settings = LogicEngine::get_graphic_settings();
 	sampling_description_value->get_text_element().set_utf8( std::to_string( settings.current_sample_count ) + "x" );
 
-	//if( settings.current_sample_count <= 1 ) sampling_decrease_button->deactivate();
-	//else sampling_decrease_button->activate();
+	if( settings.current_sample_count <= 1 ) sampling_decrease_button->deactivate();
+	else sampling_decrease_button->activate();
 
 	if( settings.current_sample_count >= settings.max_sample_count ) sampling_increase_button->deactivate();
 	else sampling_increase_button->activate();

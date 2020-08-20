@@ -148,9 +148,8 @@ void noxcain::DebugLevel::update_level_logic( const std::chrono::nanoseconds& de
 	}
 
 	check_events( deltaTime );
-
-	const auto& end = performance_time_stamp - ( 1.0-scroll_bar->get_position() ) * PERFORMANCE_TIME_FRAME;
-	const auto& start_frame = end - scroll_bar->get_scale() * PERFORMANCE_TIME_FRAME;
+	const auto& start_frame = performance_time_stamp + ( scroll_bar->get_position()*( 1.0 - scroll_bar->get_scale() ) - 1.0 )*PERFORMANCE_TIME_FRAME;
+	const auto& end = start_frame + scroll_bar->get_scale()*PERFORMANCE_TIME_FRAME;
 
 	DOUBLE factor = ( scissor_label->get_width() ) / ( end - start_frame ).count();
 

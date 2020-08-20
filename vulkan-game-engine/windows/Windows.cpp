@@ -83,7 +83,7 @@ void noxcain::Window::add_surface_extension( std::vector<const char*>& extension
 
 void noxcain::Window::close() const
 {
-	if( operator bool() )
+	if( *this )
 	{
 		PostMessage( window_handle, WM_DESTROY, NULL, NULL );
 	}
@@ -98,7 +98,19 @@ bool noxcain::Window::window_changed() const
 {
 	//TODO should never happen under windows?
 	//important for android and co.
-	return GetActiveWindow() != window_handle;
+	return !IsWindow( window_handle );
+}
+
+void noxcain::Window::recreate_swapchain( bool recreate_surface ) const
+{
+	if( *this )
+	{
+		PostMessage( window_handle, (UINT)CustomMessages::NXCM_RECREATE_SWAPCHAIN, UINT32( recreate_surface ), 0 );
+	}
+	else
+	{
+		LogicEngine::finish();
+	}
 }
 
 noxcain::Window::Window( std::shared_ptr<WindowClass> window_class ) : window_class( window_class )
@@ -138,6 +150,16 @@ BOOL noxcain::Window::display_callback( HMONITOR monitor, HDC device_context, LP
 	return true;
 }
 
+void noxcain::Window::check_swapchain_status()
+{
+	if( swapchain_needed && !is_invalid_size && !is_resizing )
+	{
+		if( GraphicEngine::execute_swapchain_recreation( recreate_surface ) ) LogicEngine::resume();
+		else LogicEngine::finish();
+		swapchain_needed = false;
+	}
+}
+
 void noxcain::Window::draw()
 {
 	if( window_class )
@@ -165,7 +187,7 @@ void noxcain::Window::draw()
 			{
 				if( result == -1 )
 				{
-					DebugBreak();
+					break;
 				}
 				else
 				{
@@ -220,6 +242,21 @@ LRESULT CALLBACK noxcain::WindowClass::windowProc_( _In_ HWND hWnd, _In_ UINT uM
 					{
 						ShowWindow( window->window_handle, SW_RESTORE );
 					}
+					break;
+				}
+				case WM_SIZE:
+				{
+					UINT32 width  = LOWORD( lParam );
+					UINT32 height = HIWORD( lParam );
+					window->is_invalid_size = !width || !height;
+					window->check_swapchain_status();
+					break;
+				}
+				case (UINT)Window::CustomMessages::NXCM_RECREATE_SWAPCHAIN:
+				{
+					window->swapchain_needed = true;
+					window->recreate_surface = wParam;
+					window->check_swapchain_status();
 					break;
 				}
 				default:

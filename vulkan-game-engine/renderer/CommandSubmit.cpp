@@ -83,31 +83,32 @@ bool noxcain::CommandSubmit::set_newest_command_buffer( SubmitCommandBufferData 
 
 bool noxcain::CommandSubmit::check_swapchain()
 {
+	
 	std::unique_lock lock( submit_mutex );
 	if( status == Status::RECREAT_SWAPCHAIN )
 	{
-		if( GraphicEngine::recreate_swapchain( lost_surface ) )
+		if( buffer_available )
 		{
-			create_semaphores();
-			status = Status::SUBMIT;
-			if( buffer_available )
-			{
-				buffer_available = false;
-				free_buffer_ids.push_back( available_buffer.id );
-			}
+			buffer_available = false;
+			free_buffer_ids.push_back( available_buffer.id );
 		}
-		else
-		{
-			status = Status::EXIT;
-		}
-		lost_surface = false;
+
+		LogicEngine::pause();
+		GraphicEngine::signal_swapchain_recreation( lost_surface );
+		status = Status::SUBMIT;
 		submit_condition.notify_all();
 	}
 
 	return status != Status::EXIT;
 }
 
-void noxcain::CommandSubmit::recreate_swapchain( bool recreate_surface )
+bool noxcain::CommandSubmit::running() const
+{
+	std::unique_lock lock( submit_mutex );
+	return status != Status::EXIT;
+}
+
+void noxcain::CommandSubmit::signal_swapchain_recreation( bool recreate_surface )
 {
 	std::unique_lock lock( submit_mutex );
 	status = Status::RECREAT_SWAPCHAIN;
@@ -138,7 +139,7 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 
 	if( r_handler.all_okay() )
 	{
-		while( status != Status::EXIT )
+		while( running() )
 		{
 			r_handler.reset();
 			const auto start_time = std::chrono::steady_clock::now();
@@ -151,16 +152,24 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 				{
 					return buffer_available || status == Status::EXIT;
 				} );
-				current_buffers = available_buffer;
-				buffer_available = false;
+
+				if( buffer_available )
+				{
+					current_buffers = available_buffer;
+					buffer_available = false;
+				}
+				else
+				{
+					continue;
+				}
 			}
 
 			time_collection_all.start_frame( 0.0, 0.7, 0.3, 1.0, "" );
 
 			// submit command buffers
 			{
-				const vk::SwapchainKHR& swapChain = GraphicEngine::get_swapchain();
-				UINT32 image_index = r_handler << device.acquireNextImageKHR( swapChain, GRAPHIC_TIMEOUT_DURATION.count(), get_semaphore( SemaphoreIds::ACQUIRE ), vk::Fence() );
+				const vk::SwapchainKHR& swapchain = GraphicEngine::get_swapchain();
+				UINT32 image_index = r_handler << device.acquireNextImageKHR( swapchain, GRAPHIC_TIMEOUT_DURATION.count(), get_semaphore( SemaphoreIds::ACQUIRE ), vk::Fence() );
 				if( r_handler.all_okay() )
 				{
 					vk::PipelineStageFlags render_stage_flags( vk::PipelineStageFlagBits::eColorAttachmentOutput );
@@ -181,7 +190,7 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 
 					if( r_handler.all_okay() )
 					{
-						r_handler << queue.presentKHR( vk::PresentInfoKHR( 1, &get_semaphore( SemaphoreIds::SUPER_SAMPLING ), 1, &swapChain, &image_index ) );
+						r_handler << queue.presentKHR( vk::PresentInfoKHR( 1, &get_semaphore( SemaphoreIds::SUPER_SAMPLING ), 1, &swapchain, &image_index ) );
 						if( !r_handler.is_critical() )
 						{
 							r_handler << device.waitForFences( { frame_end_fence }, VK_TRUE, ~UINT64( 0 ) );
@@ -245,7 +254,7 @@ noxcain::UINT32 noxcain::CommandSubmit::submit_loop()
 
 			if( !r_handler.all_okay() && !r_handler.is_critical() )
 			{
-				recreate_swapchain( r_handler.get_last_error() == vk::Result::eErrorSurfaceLostKHR );
+				signal_swapchain_recreation( r_handler.get_last_error() == vk::Result::eErrorSurfaceLostKHR );
 			}
 
 			if( r_handler.is_critical() ) break;

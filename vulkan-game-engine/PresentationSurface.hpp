@@ -34,6 +34,12 @@ namespace noxcain
 		/// <returns>True if surface was externaly swap with another instance</returns>
 		virtual bool window_changed() const = 0;
 
+		/// <summary>
+		/// triggers the main thread to create a new surface with swapchain
+		/// </summary>
+		/// <returns>True if surface was externaly swap with another instance</returns>
+		virtual void recreate_swapchain( bool recreate_surface ) const = 0;
+
 		virtual explicit operator bool() const
 		{
 			return false;

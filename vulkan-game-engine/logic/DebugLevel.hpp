@@ -74,7 +74,7 @@ namespace noxcain
 		std::unique_ptr<BaseButton> exit_button;
 		std::unique_ptr<VectorTextLabel2D> tooltip;
 
-		constexpr static std::chrono::nanoseconds PERFORMANCE_TIME_FRAME = std::chrono::milliseconds( 10 );
+		constexpr static std::chrono::nanoseconds PERFORMANCE_TIME_FRAME = std::chrono::milliseconds( 20 );
 		std::chrono::steady_clock::time_point performance_time_stamp;
 		std::unique_ptr<Region> scissor_label;
 
