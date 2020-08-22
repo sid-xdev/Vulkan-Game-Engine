@@ -22,8 +22,10 @@ noxcain::LogicEngine::LogicEngine()
 	new_key_events.clear();
 	new_region_key_events.clear();
 
-	graphic_settings.current_sample_count = 1;
-	graphic_settings.current_super_sampling_factor = 1.0F;
+	std::unique_lock lock( write_settings_mutex );
+	write_graphic_settings.current_sample_count = 2;
+	write_graphic_settings.max_sample_count = 8;
+	write_graphic_settings.current_super_sampling_factor = 1.0F;
 }
 
 noxcain::UINT32 noxcain::LogicEngine::logic_update()
@@ -177,6 +179,20 @@ void noxcain::LogicEngine::set_event( InputEventTypes type, INT32 param1, INT32 
 	};
 }
 
+void noxcain::LogicEngine::apply_graphic_settings()
+{
+	std::unique_lock lock( engine->status_mutex );
+	engine->status_condition.wait( lock, []() -> bool
+	{
+		return ( engine->status != Status::UPDATING );
+	} );
+	
+	std::unique_lock settings_lock_1( engine->write_settings_mutex );
+	std::unique_lock settings_lock_2( engine->read_settings_mutex );
+
+	engine->read_graphic_settings = engine->write_graphic_settings;
+}
+
 void noxcain::LogicEngine::update()
 {
 	std::unique_lock lock( engine->status_mutex );
@@ -258,12 +274,54 @@ noxcain::NxMatrix4x4 noxcain::LogicEngine::get_camera_matrix()
 	return engine->current_level->get_active_camera();
 }
 
-void noxcain::LogicEngine::set_graphic_settings( UINT32 sampleCount, FLOAT32 superSamplingFactor, UINT32 width, UINT32 height )
+void noxcain::LogicEngine::set_sample_count( UINT32 count )
 {
-	std::unique_lock lock( engine->settings_mutex );
-	
-	engine->graphic_settings.current_sample_count = sampleCount;
-	engine->graphic_settings.current_super_sampling_factor = superSamplingFactor;
-	engine->graphic_settings.current_resolution = { width, height };
+	std::unique_lock lock( engine->write_settings_mutex );
+	engine->write_graphic_settings.current_sample_count = count;
 }
 
+void noxcain::LogicEngine::set_graphic_settings( UINT32 sample_count, FLOAT32 superSamplingFactor, UINT32 width, UINT32 height )
+{
+	std::unique_lock lock( engine->write_settings_mutex );
+	
+	engine->write_graphic_settings.current_sample_count = sample_count;
+	engine->write_graphic_settings.current_super_sampling_factor = superSamplingFactor;
+	engine->write_graphic_settings.current_resolution = { width, height };
+}
+
+noxcain::GraphicSetting::GraphicSetting( std::shared_mutex& graphic_mutex, Settings& graphic_settings ) : lock( graphic_mutex ), settings( graphic_settings )
+{
+}
+
+noxcain::GraphicSetting::GraphicSetting( const GraphicSetting& other ) : lock( *other.lock.mutex() ), settings( other.settings )
+{
+	
+}
+
+noxcain::UINT32 noxcain::GraphicSetting::get_max_sample_count() const
+{
+	return settings.max_sample_count;
+}
+
+noxcain::FLOAT32 noxcain::GraphicSetting::get_max_super_sampling_factor() const
+{
+	return settings.max_super_sampling_factor;
+}
+
+noxcain::FLOAT32 noxcain::GraphicSetting::get_super_sampling_factor() const
+{
+	return settings.current_super_sampling_factor;
+}
+
+noxcain::UINT32 noxcain::GraphicSetting::get_sample_count() const
+{
+	return settings.current_sample_count;
+}
+
+noxcain::ResolutionSetting noxcain::GraphicSetting::get_accumulated_resolution() const
+{
+	ResolutionSetting setting;
+	setting.width = UINT32( settings.current_resolution.width * settings.current_super_sampling_factor );
+	setting.height = UINT32( settings.current_resolution.height * settings.current_super_sampling_factor );
+	return setting;
+}

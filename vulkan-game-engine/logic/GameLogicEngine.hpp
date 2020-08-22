@@ -38,22 +38,32 @@ namespace noxcain
 		INT32 y = 0;
 	};
 
-	struct GraphicSettings
+	class GraphicSetting
 	{
-		UINT32 max_sample_count = 0;
-		UINT32 current_sample_count = 0;
-
-		FLOAT32 max_super_sampling_factor = 0;
-		FLOAT32 current_super_sampling_factor = 0;
-
-		ResolutionSetting current_resolution;
-		ResolutionSetting get_accumulated_resolution() const
+	private:
+		friend class LogicEngine;
+		struct Settings
 		{
-			ResolutionSetting setting;
-			setting.width = UINT32( current_resolution.width * current_super_sampling_factor );
-			setting.height = UINT32( current_resolution.height * current_super_sampling_factor );
-			return setting;
-		}
+			UINT32 max_sample_count = 0;
+			UINT32 current_sample_count = 0;
+
+			FLOAT32 max_super_sampling_factor = 0;
+			FLOAT32 current_super_sampling_factor = 0;
+
+			ResolutionSetting current_resolution;
+		}&settings;
+
+		std::shared_lock<std::shared_mutex> lock;
+		GraphicSetting( std::shared_mutex& graphic_mutex, Settings& graphic_settings );
+	public:
+		GraphicSetting( const GraphicSetting& other );
+
+		UINT32 get_max_sample_count() const;
+		UINT32 get_sample_count() const;
+		FLOAT32 get_max_super_sampling_factor() const;
+		FLOAT32 get_super_sampling_factor() const;
+		
+		ResolutionSetting get_accumulated_resolution() const;
 	};
 
 	enum class InputEventTypes
@@ -72,15 +82,17 @@ namespace noxcain
 	{
 	public:
 		//graphic properties
-		static GraphicSettings get_graphic_settings()
+		static const GraphicSetting get_graphic_settings()
 		{
-			std::unique_lock<std::mutex> lock( engine->settings_mutex );
-			return engine->graphic_settings;
+			GraphicSetting settings( engine->read_settings_mutex, engine->read_graphic_settings );
+			return settings;
 		}
 
 		static NxMatrix4x4 get_camera_matrix();
 
+		static void set_sample_count( UINT32 sample_count );
 		static void set_graphic_settings( UINT32 sampleCount, FLOAT32 superSamplingFactor, UINT32 width, UINT32 height );
+		static void apply_graphic_settings();
 		
 		static const GameLevel::RenderableContainer<VectorText3D>& get_vector_decals();
 		static const GameLevel::RenderableContainer<GeometryObject>& get_geometry_objects();
@@ -158,8 +170,10 @@ namespace noxcain
 		} status = Status::DORMANT;
 		
 		// special graphic settings sync
-		std::mutex settings_mutex;
-		GraphicSettings graphic_settings;
+		std::shared_mutex read_settings_mutex;
+		std::shared_mutex write_settings_mutex;
+		GraphicSetting::Settings read_graphic_settings;
+		GraphicSetting::Settings write_graphic_settings;
 		
 		// finish game 
 		void finish_game();

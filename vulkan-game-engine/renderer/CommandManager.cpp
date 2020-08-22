@@ -25,7 +25,7 @@ noxcain::CommandManager::CommandManager()
 
 void noxcain::CommandManager::start_loop()
 {
-	comman_main_thread = std::thread( &CommandManager::run_render_loop, this );
+	command_main_thread = std::thread( &CommandManager::run_render_loop, this );
 }
 
 void noxcain::CommandManager::run_render_loop()
@@ -59,10 +59,7 @@ void noxcain::CommandManager::run_render_loop()
 		{
 			TimeFrame time_frame( record_time_frame, 0.0, 0.8, 0.0, 1.0, "pre buffer" );
 			
-			//trigger logic update in logic thread
-			LogicEngine::update();
-			
-			if( !validate_render_passes() )
+			if( !update_logic( submit ) || !validate_render_passes() )
 			{
 				//TODO error?
 				return;
@@ -121,7 +118,7 @@ void noxcain::CommandManager::run_render_loop()
 
 		auto g_settings = LogicEngine::get_graphic_settings();
 		auto resolution = g_settings.get_accumulated_resolution();
-		bool multi_sampling = g_settings.current_sample_count > 1;
+		bool multi_sampling = g_settings.get_sample_count() > 1;
 
 		vk::QueryPool timestamp_pool = GraphicEngine::get_render_query().get_timestamp_pool();
 
@@ -223,23 +220,51 @@ bool noxcain::CommandManager::validate_render_passes()
 		deferred_render_pass.update_format( default_color_format, GraphicEngine::get_memory_manager().get_image( MemoryManager::RenderDestinationImages::COLOR ).format );
 		deferred_render_pass.update_format( depth_format, GraphicEngine::get_memory_manager().get_image( MemoryManager::RenderDestinationImages::DEPTH_SAMPLED ).format );
 		deferred_render_pass.update_format( stencil_format, GraphicEngine::get_memory_manager().get_image( MemoryManager::RenderDestinationImages::STENCIL_UNSAMPLED ).format );
-	}
-	else
-	{
-		auto formats = GraphicEngine::get_memory_manager().select_main_render_formats();
-		deferred_render_pass.update_format( default_color_format, formats.color );
-		deferred_render_pass.update_format( depth_format, formats.depth );
-		deferred_render_pass.update_format( stencil_format, formats.stencil );
-	}
 
-	deferred_render_pass.update_sample_count( multi_sample_count, static_cast<vk::SampleCountFlagBits>( LogicEngine::get_graphic_settings().current_sample_count ) );
-	finalize_render_pass.update_format( swap_chain_image_format, GraphicEngine::get_swapchain_image_format() );
+		deferred_render_pass.update_sample_count( multi_sample_count, static_cast<vk::SampleCountFlagBits>( LogicEngine::get_graphic_settings().get_sample_count() ) );
+		finalize_render_pass.update_format( swap_chain_image_format, GraphicEngine::get_swapchain_image_format() );
 
-	if( deferred_render_pass.get_render_pass() && finalize_render_pass.get_render_pass() )
-	{
-		return true;
+		return deferred_render_pass.get_render_pass() && finalize_render_pass.get_render_pass();
 	}
 	return false;
+}
+
+inline bool noxcain::CommandManager::update_logic( CommandSubmit& submit_controller )
+{
+	LogicEngine::apply_graphic_settings();
+	if( check_settings( submit_controller ) )
+	{
+		LogicEngine::apply_graphic_settings();
+		LogicEngine::update();
+		return true;
+	}
+	return true;
+}
+
+bool noxcain::CommandManager::check_settings( CommandSubmit& submit_controller )
+{
+	ResultHandler<vk::Result> r_handle( vk::Result::eSuccess );
+	vk::Device device = GraphicEngine::get_device();
+	
+	//get current graphic settings
+	const auto& graphic_settings = LogicEngine::get_graphic_settings();
+	const UINT32 sample_count = graphic_settings.get_sample_count();
+	const auto resolution = graphic_settings.get_accumulated_resolution();
+	
+	//check for deferred renderer, render pass and render targets
+	if( !deferred_frame_buffer || sample_count != old_sample_count || resolution.width != old_frame_buffer_width || resolution.height != old_frame_buffer_height )
+	{
+		submit_controller.clean_command_buffer();
+		r_handle << device.waitIdle();
+		if( r_handle.all_okay() )
+		{
+			device.destroyFramebuffer( deferred_frame_buffer );
+			deferred_frame_buffer = vk::Framebuffer();
+
+			return GraphicEngine::get_memory_manager().setup_main_render_destination();
+		}
+	}
+	return r_handle.all_okay();
 }
 
 bool noxcain::CommandManager::validate_frame_buffers()
@@ -247,22 +272,15 @@ bool noxcain::CommandManager::validate_frame_buffers()
 	ResultHandler<vk::Result> r_handle( vk::Result::eSuccess );
 	vk::Device device = GraphicEngine::get_device();
 	
-	auto graphic_settings = LogicEngine::get_graphic_settings();
-	auto current_resolution = graphic_settings.get_accumulated_resolution();
+	auto sample_count = LogicEngine::get_graphic_settings().get_sample_count();
+	auto resolution = LogicEngine::get_graphic_settings().get_accumulated_resolution();
 
 	// validate deferred_frame_buffer
-	if( !deferred_frame_buffer || graphic_settings.current_sample_count != old_sample_count || current_resolution.width != old_frame_buffer_width || current_resolution.height != old_frame_buffer_height )
+	if( !deferred_frame_buffer )
 	{
 		r_handle << device.waitIdle();
 		if( r_handle.all_okay() )
 		{
-			device.destroyFramebuffer( deferred_frame_buffer );
-			deferred_frame_buffer = vk::Framebuffer();
-
-			if( !GraphicEngine::get_memory_manager().setup_main_render_destination() )
-			{
-				return false;
-			}
 			auto attachment_count = deferred_render_pass.get_attachment_count();
 
 			std::vector<vk::ImageView> views;
@@ -290,14 +308,13 @@ bool noxcain::CommandManager::validate_frame_buffers()
 			views.push_back( GraphicEngine::get_memory_manager().get_image( MemoryManager::RenderDestinationImages::DEPTH_SAMPLED ).view );
 			deferred_clear_colors.push_back( vk::ClearDepthStencilValue( 1.0F, 0U ) );
 
-			if( graphic_settings.current_sample_count > 1 )
+			if( sample_count > 1 )
 			{
 				// attachment5 stencil only
 				views.push_back( GraphicEngine::get_memory_manager().get_image( MemoryManager::RenderDestinationImages::STENCIL_UNSAMPLED ).view );
 				deferred_clear_colors.push_back( vk::ClearDepthStencilValue( 0.0F, 1U ) );
 			}
 
-			auto resolution = LogicEngine::get_graphic_settings().get_accumulated_resolution();
 			vk::Extent3D extent( resolution.width, resolution.height, 1 );
 
 			if( views.size() != attachment_count )
@@ -319,9 +336,9 @@ bool noxcain::CommandManager::validate_frame_buffers()
 			return false;
 		}
 
-		old_frame_buffer_width = current_resolution.width;
-		old_frame_buffer_height = current_resolution.height;
-		old_sample_count = graphic_settings.current_sample_count;
+		old_frame_buffer_width = resolution.width;
+		old_frame_buffer_height = resolution.height;
+		old_sample_count = sample_count;
 	}
 
 	// validate finailze_frame_buffer 
@@ -330,7 +347,6 @@ bool noxcain::CommandManager::validate_frame_buffers()
 	{
 		if( !current_swapchain )
 		{
-			// TODO error log
 			return false;
 		}
 
@@ -360,6 +376,11 @@ bool noxcain::CommandManager::validate_frame_buffers()
 			};
 
 			vk::Extent2D extent = GraphicEngine::get_window_resolution();
+			if( extent.width == 0 || extent.height == 0 )
+			{
+				// error TODO
+				return false;
+			}
 
 			auto attachment_count = finalize_render_pass.get_attachment_count();
 
@@ -421,17 +442,12 @@ bool noxcain::CommandManager::validate_command_buffers( std::size_t buffer_id )
 	if( command_buffers[buffer_id].empty() )
 	{
 		command_buffers[buffer_id] = r_handle << device.allocateCommandBuffers( vk::CommandBufferAllocateInfo( command_pools[buffer_id], vk::CommandBufferLevel::ePrimary, 1 + image_count ) );
-		if( !r_handle.all_okay() )
-		{
-			return false;
-		}
 	}
-	return true;
+	return r_handle.all_okay();
 }
 
 void noxcain::CommandManager::describe_deferred_render_pass()
-{	
-	bool multi_sampling = LogicEngine::get_graphic_settings().current_sample_count > 1;
+{
 	multi_sample_count = deferred_render_pass.get_sample_count_handle();
 	auto fixed_single_sample_count = deferred_render_pass.get_sample_count_handle();
 
@@ -440,60 +456,57 @@ void noxcain::CommandManager::describe_deferred_render_pass()
 	depth_format = deferred_render_pass.get_format_handle();
 
 	// attachment 0
-	auto color_att = deferred_render_pass.add_attachment( default_color_format, multi_sample_count,
+	auto color_att = deferred_render_pass.add_attachment( default_color_format, multi_sample_count, vk::AttachmentDescriptionFlags(),
 														  vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
 														  vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
 														  vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal );
 
 	// attachment 1
-	auto color_resolved_att = deferred_render_pass.add_attachment( default_color_format, fixed_single_sample_count,
-																	vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eStore,
-																	vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-																	vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal );
+	auto color_resolved_att = deferred_render_pass.add_attachment( default_color_format, fixed_single_sample_count, vk::AttachmentDescriptionFlags(),
+																   vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eStore,
+																   vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
+																   vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal );
 
 	// attachment 2
-	auto normal_att = deferred_render_pass.add_attachment( default_color_format, multi_sample_count,
-															vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
-															vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-															vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal );
+	auto normal_att = deferred_render_pass.add_attachment( default_color_format, multi_sample_count, vk::AttachmentDescriptionFlags(),
+														   vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
+														   vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
+														   vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal );
 
 	// attachment 3
-	auto position_att = deferred_render_pass.add_attachment( default_color_format, multi_sample_count,
+	auto position_att = deferred_render_pass.add_attachment( default_color_format, multi_sample_count, vk::AttachmentDescriptionFlags(),
 															 vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
 															 vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
 															 vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal );
 
 	// attachment 4
-	auto depth_att = deferred_render_pass.add_attachment( depth_format, multi_sample_count,
-														   vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
-														   vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-														   vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilReadOnlyOptimal );
+	auto depth_att = deferred_render_pass.add_attachment( depth_format, multi_sample_count, vk::AttachmentDescriptionFlags(),
+														  vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
+														  vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
+														  vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilReadOnlyOptimal );
 
 	// attachment 5
-	auto stencil_att = RenderPassDescription::AttachmentHandle();
-	if( multi_sampling )
-	{
-		stencil_att = deferred_render_pass.add_attachment( stencil_format, fixed_single_sample_count,
-														   vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-														   vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
-														   vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilReadOnlyOptimal );
-	}
+	auto stencil_att = deferred_render_pass.add_attachment( stencil_format, fixed_single_sample_count, vk::AttachmentDescriptionFlags(),
+															vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
+															vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
+															vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+															RenderPassDescription::SamplingMode::MULTI );
 
 	auto geometry_subpass = deferred_render_pass.add_subpass( { // INPUT
-															   },
+															  },
 															   { // COLOR
 																   { color_att, vk::ImageLayout::eColorAttachmentOptimal },
-															       { normal_att, vk::ImageLayout::eColorAttachmentOptimal },
-															       { position_att, vk::ImageLayout::eColorAttachmentOptimal },
+																   { normal_att, vk::ImageLayout::eColorAttachmentOptimal },
+																   { position_att, vk::ImageLayout::eColorAttachmentOptimal },
 															   },
 															   { //RESOLVE
 															   },
 															   { //PRESERVE
 															   },
-															   { depth_att, vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal } ); //DEPTH
+															  { depth_att, vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal } ); //DEPTH
 
 	auto decal_subpass = deferred_render_pass.add_subpass( { // INPUT
-															},
+														   },
 															{ // COLOR
 																{ color_att, vk::ImageLayout::eColorAttachmentOptimal },
 																{ normal_att, vk::ImageLayout::eColorAttachmentOptimal },
@@ -503,69 +516,60 @@ void noxcain::CommandManager::describe_deferred_render_pass()
 															},
 															{ // PRESERVED
 															},
-															{ depth_att, vk::ImageLayout::eDepthStencilReadOnlyOptimal } );
-	auto edge_detection_subpass = RenderPassDescription::SubpassHandle();
-	if( multi_sampling )
-	{
-		auto edge_detection_subpass = deferred_render_pass.add_subpass( { // INPUT
-																			{ color_att, vk::ImageLayout::eShaderReadOnlyOptimal },
-																			{ normal_att, vk::ImageLayout::eShaderReadOnlyOptimal },
-																			{ position_att, vk::ImageLayout::eShaderReadOnlyOptimal }
-																		},
+														   { depth_att, vk::ImageLayout::eDepthStencilReadOnlyOptimal } );
+
+	auto edge_detection_subpass = deferred_render_pass.add_subpass( { // INPUT
+																		{ color_att, vk::ImageLayout::eShaderReadOnlyOptimal },
+																		{ normal_att, vk::ImageLayout::eShaderReadOnlyOptimal },
+																		{ position_att, vk::ImageLayout::eShaderReadOnlyOptimal }
+																	},
 																		{ // COLOR
 																		},
 																		{ // RESOLVE
 																		},
 																		{ // PRESERVE
 																		},
-																		{ stencil_att, vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal } );
-	}
+																	{ stencil_att, vk::ImageLayout::eDepthReadOnlyStencilAttachmentOptimal },
+																	RenderPassDescription::SamplingMode::MULTI );
 
-	auto shading_render_subpass = multi_sampling ?
-		                                  deferred_render_pass.add_subpass( { // INPUT
-																		        { color_att, vk::ImageLayout::eShaderReadOnlyOptimal },
-																		        { normal_att, vk::ImageLayout::eShaderReadOnlyOptimal },
-																		        { position_att, vk::ImageLayout::eShaderReadOnlyOptimal }
-										                                    },
-																			{ // COLOR
-																				{ color_resolved_att, vk::ImageLayout::eColorAttachmentOptimal }
-																			},
-																			{ // RESOLVE
-																			},
-																			{ // PRESERVE
-																			},
-																			{ stencil_att, vk::ImageLayout::eDepthStencilReadOnlyOptimal } ) :
-										  deferred_render_pass.add_subpass( { // INPUT
-																				{ color_att, vk::ImageLayout::eShaderReadOnlyOptimal },
-																				{ normal_att, vk::ImageLayout::eShaderReadOnlyOptimal },
-																				{ position_att, vk::ImageLayout::eShaderReadOnlyOptimal }
-																			},
-																			{ // COLOR
-																				{ color_resolved_att, vk::ImageLayout::eColorAttachmentOptimal }
-																			},
-																			{ // RESOLVE
-																			},
-																			{
-																			} );// PRESERVE
+	auto multi_shading_render_subpass =
+		deferred_render_pass.add_subpass( { { color_att, vk::ImageLayout::eShaderReadOnlyOptimal }, { normal_att, vk::ImageLayout::eShaderReadOnlyOptimal }, { position_att, vk::ImageLayout::eShaderReadOnlyOptimal } },
+										  { { color_resolved_att, vk::ImageLayout::eColorAttachmentOptimal } }, // COLOR
+										  {}, // RESOLVE
+										  {}, // PRESERVE
+										  { stencil_att, vk::ImageLayout::eDepthStencilReadOnlyOptimal },
+										  RenderPassDescription::SamplingMode::MULTI );
+	auto single_shading_render_subpass =
+		deferred_render_pass.add_subpass( { { color_att, vk::ImageLayout::eShaderReadOnlyOptimal }, { normal_att, vk::ImageLayout::eShaderReadOnlyOptimal }, { position_att, vk::ImageLayout::eShaderReadOnlyOptimal } },
+										  { { color_resolved_att, vk::ImageLayout::eColorAttachmentOptimal } },// COLOR
+										  {}, // RESOLVE
+										  {}, // PRESERVE
+										  RenderPassDescription::AttachmentHandleReference(),
+										  RenderPassDescription::SamplingMode::SINGLE );
 
 
 
-	deferred_render_pass.add_dependency( geometry_subpass, vk::PipelineStageFlagBits::eLateFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-										  decal_subpass, vk::PipelineStageFlagBits::eEarlyFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentRead );
+	deferred_render_pass.add_dependency( vk::DependencyFlagBits::eByRegion,
+										 geometry_subpass, vk::PipelineStageFlagBits::eLateFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+										 decal_subpass, vk::PipelineStageFlagBits::eEarlyFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentRead );
 
-	if( multi_sampling )
-	{
-		deferred_render_pass.add_dependency( decal_subpass, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite,
-											 edge_detection_subpass, vk::PipelineStageFlagBits::eFragmentShader, vk::AccessFlagBits::eShaderRead );
 
-		deferred_render_pass.add_dependency( edge_detection_subpass, vk::PipelineStageFlagBits::eLateFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-											 shading_render_subpass, vk::PipelineStageFlagBits::eEarlyFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentRead );
-	}
-	else
-	{
-		deferred_render_pass.add_dependency( decal_subpass, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite,
-											 shading_render_subpass, vk::PipelineStageFlagBits::eFragmentShader, vk::AccessFlagBits::eShaderRead );
-	}
+	deferred_render_pass.add_dependency( vk::DependencyFlagBits::eByRegion,
+										 decal_subpass, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite,
+										 edge_detection_subpass, vk::PipelineStageFlagBits::eFragmentShader, vk::AccessFlagBits::eShaderRead,
+										 RenderPassDescription::SamplingMode::MULTI );
+
+	deferred_render_pass.add_dependency( vk::DependencyFlagBits::eByRegion,
+										 edge_detection_subpass, vk::PipelineStageFlagBits::eLateFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+										 multi_shading_render_subpass, vk::PipelineStageFlagBits::eEarlyFragmentTests, vk::AccessFlagBits::eDepthStencilAttachmentRead,
+										 RenderPassDescription::SamplingMode::MULTI );
+
+	deferred_render_pass.add_dependency( vk::DependencyFlagBits::eByRegion,
+										 decal_subpass, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite,
+										 single_shading_render_subpass, vk::PipelineStageFlagBits::eFragmentShader, vk::AccessFlagBits::eShaderRead,
+										 RenderPassDescription::SamplingMode::SINGLE );
+
+	deferred_render_pass.set_decider( multi_sample_count );
 }
 
 
@@ -576,7 +580,7 @@ void noxcain::CommandManager::describe_finalize_render_pass()
 	swap_chain_image_format = finalize_render_pass.get_format_handle( GraphicEngine::get_swapchain_image_format() );
 	auto fixed_single_sample_count = finalize_render_pass.get_sample_count_handle( vk::SampleCountFlagBits::e1 );
 
-	auto final_render_target = finalize_render_pass.add_attachment( swap_chain_image_format, fixed_single_sample_count,
+	auto final_render_target = finalize_render_pass.add_attachment( swap_chain_image_format, fixed_single_sample_count, vk::AttachmentDescriptionFlags(),
 																	vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
 																	vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
 																	vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR );
@@ -595,7 +599,8 @@ void noxcain::CommandManager::describe_finalize_render_pass()
 			{final_render_target, vk::ImageLayout::eColorAttachmentOptimal}
 		} );
 
-	finalize_render_pass.add_dependency( post_processing_subpass, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentRead,
+	finalize_render_pass.add_dependency( vk::DependencyFlagBits::eByRegion,
+										 post_processing_subpass, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentRead,
 										 overlay_subpass, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::AccessFlagBits::eColorAttachmentWrite );
 }
 
@@ -712,9 +717,9 @@ void noxcain::CommandManager::prepare_main_loop()
 noxcain::CommandManager::~CommandManager()
 {
 	LogicEngine::finish();
-	if( comman_main_thread.joinable() )
+	if( command_main_thread.joinable() )
 	{
-		comman_main_thread.join();
+		command_main_thread.join();
 	}
 
 	vk::Device device = GraphicEngine::get_device();

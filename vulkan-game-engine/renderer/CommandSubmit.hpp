@@ -27,6 +27,7 @@ namespace noxcain
 
 		INT32 get_free_buffer_id();
 		bool set_newest_command_buffer( SubmitCommandBufferData buffer_data );
+		void clean_command_buffer();
 		bool check_swapchain();
 
 	private:

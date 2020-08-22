@@ -133,7 +133,7 @@ namespace noxcain
 			vk::Format depth;
 			vk::Format stencil;
 		};
-		RenderDestinationFormats select_main_render_formats();
+		inline RenderDestinationFormats select_main_render_formats( UINT32& width, UINT32& height, UINT32& sample_count  );
 		bool setup_main_render_destination();
 
 		//return: true if format has changed

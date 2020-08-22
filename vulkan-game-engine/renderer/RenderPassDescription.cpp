@@ -5,119 +5,85 @@
 
 std::size_t noxcain::RenderPassDescription::get_attachment_count() const
 {
-	return attachments.size();
+	if( outdated )
+	{
+		return 0;
+	}
+	return last_attachment_count;
 }
 
 noxcain::RenderPassDescription::FormatHandle noxcain::RenderPassDescription::get_format_handle( vk::Format initial_format )
 {
 	FormatHandle new_handle;
-	new_handle.index = format_bindings.size();
-	format_bindings.emplace_back().format = initial_format;
+	new_handle.index = formats.size();
+	formats.emplace_back( initial_format );
 	return new_handle;
 }
 
 noxcain::RenderPassDescription::SampleCountHandle noxcain::RenderPassDescription::get_sample_count_handle( vk::SampleCountFlagBits initial_sample_count )
 {
 	SampleCountHandle new_handle;
-	new_handle.index = sample_count_bindings.size();
-	sample_count_bindings.emplace_back().sample_count = initial_sample_count;
+	new_handle.index = sample_counts.size();
+	sample_counts.emplace_back( initial_sample_count );
 	return new_handle;
 }
 
-noxcain::RenderPassDescription::AttachmentHandle noxcain::RenderPassDescription::add_attachment( FormatHandle format, SampleCountHandle sample_count, vk::AttachmentLoadOp load_operation, vk::AttachmentStoreOp store_operation, vk::AttachmentLoadOp stencil_load_operation, vk::AttachmentStoreOp stencil_store_operation, vk::ImageLayout initial_image_layout, vk::ImageLayout final_image_layout )
+noxcain::RenderPassDescription::AttachmentHandle noxcain::RenderPassDescription::add_attachment( 
+	FormatHandle format, SampleCountHandle sample_count,
+	vk::AttachmentDescriptionFlags description_flags,
+	vk::AttachmentLoadOp load_operation, vk::AttachmentStoreOp store_operation,
+	vk::AttachmentLoadOp stencil_load_operation, vk::AttachmentStoreOp stencil_store_operation,
+	vk::ImageLayout initial_image_layout, vk::ImageLayout final_image_layout, SamplingMode sampling_mode )
 {
 	if( format && sample_count )
 	{
 		AttachmentHandle new_handle;
-		new_handle.index = attachments.size();
+		new_handle.index = attachment_descriptions.size();
 
-		auto& format_binding = format_bindings[format.index];
-		auto& sample_count_binding = sample_count_bindings[sample_count.index];
-
-		attachments.emplace_back( vk::AttachmentDescriptionFlags(), format_binding.format, sample_count_binding.sample_count,
-								  load_operation, store_operation, stencil_load_operation, stencil_store_operation,
-								  initial_image_layout, final_image_layout );
-
-		format_binding.attachments.push_back( new_handle );
-		sample_count_binding.attachments.push_back( new_handle );
+		AttachmentDescription description = { format, sample_count, description_flags,
+											  load_operation, store_operation, stencil_load_operation, stencil_store_operation,
+											  initial_image_layout, final_image_layout, sampling_mode, 0 };
+		attachment_descriptions.emplace_back( description );
 		return new_handle;
 	}
 	return AttachmentHandle();
 }
 
-noxcain::RenderPassDescription::SubpassHandle noxcain::RenderPassDescription::add_subpass( const std::vector<AttachmentHandleReference>& input_attachment_references,
-																						   const std::vector<AttachmentHandleReference>& color_attachment_references,
-																						   const std::vector<AttachmentHandleReference>& resolve_attachment_references,
-																						   const std::vector<AttachmentHandle>& preserved_attachment_indices,
-																						   const AttachmentHandleReference depth_stencil_attachment_reference )
+noxcain::RenderPassDescription::SubpassHandle noxcain::RenderPassDescription::add_subpass( std::vector<AttachmentHandleReference> input_attachment_references,
+																						   std::vector<AttachmentHandleReference> color_attachment_references,
+																						   std::vector<AttachmentHandleReference> resolve_attachment_references,
+																						   std::vector<AttachmentHandle> preserved_attachment,
+																						   AttachmentHandleReference depth_stencil_attachment_reference,
+																						   SamplingMode sampling_mode )
 {
-	bool invalid_handle = false;
-	
 	if( resolve_attachment_references.empty() || resolve_attachment_references.size() == color_attachment_references.size() )
 	{
+		SubpassHandle new_handle;
+		new_handle.index = subpass_data_buffers.size();
 		auto& new_collection = subpass_data_buffers.emplace_back();
 
-		for( const auto& input_ref : input_attachment_references )
-		{
-			if( !input_ref.attachment )
-			{
-				//TODO error
-				return SubpassHandle();
-			}
-			new_collection.input_attachment_refs.emplace_back( input_ref.attachment.index, input_ref.layout );
-		}
-
-		for( const auto& color_ref : color_attachment_references )
-		{
-			if( !color_ref.attachment )
-			{
-				//TODO error
-				return SubpassHandle();
-			}
-			new_collection.color_attachment_refs.emplace_back( color_ref.attachment.index, color_ref.layout );
-		}
-
-		for( const auto& resolve_ref : resolve_attachment_references )
-		{
-			if( !resolve_ref.attachment )
-			{
-				//TODO error
-				return SubpassHandle();
-			}
-			new_collection.resolve_attachment_refs.emplace_back( resolve_ref.attachment.index, resolve_ref.layout );
-		}
-
-		for( const auto& preserv_ref : preserved_attachment_indices )
-		{
-			if( !preserv_ref )
-			{
-				//TODO error
-				return SubpassHandle();
-			}
-			new_collection.preserved_attachment_indices.emplace_back( preserv_ref.index );
-		}
-
-		new_collection.has_depth_stencil_attachment = static_cast<bool>( depth_stencil_attachment_reference.attachment );
-		if( new_collection.has_depth_stencil_attachment )
-		{
-			new_collection.depth_stencil_attachment_ref = vk::AttachmentReference( depth_stencil_attachment_reference.attachment.index, depth_stencil_attachment_reference.layout );
-		}
-
-		SubpassHandle new_handle;
-		new_handle.index = subpass_data_buffers.size() - 1;
+		new_collection.input_attachment_refs.swap( input_attachment_references );
+		new_collection.color_attachment_refs.swap( color_attachment_references );
+		new_collection.resolve_attachment_refs.swap( resolve_attachment_references );
+		new_collection.preserved_attachments.swap( preserved_attachment );
+		new_collection.depth_stencil_attachment_ref = depth_stencil_attachment_reference;
+		new_collection.sampling_mode = sampling_mode;
 		return new_handle;
 	}
 	return SubpassHandle();
 }
 
-bool noxcain::RenderPassDescription::add_dependency( SubpassHandle start_subpass, vk::PipelineStageFlagBits start_stage, vk::AccessFlagBits start_access, SubpassHandle final_subpass, vk::PipelineStageFlagBits final_stage, vk::AccessFlagBits final_access )
+bool noxcain::RenderPassDescription::add_dependency( vk::DependencyFlags flags,
+													 SubpassHandle start_subpass, vk::PipelineStageFlagBits start_stage, vk::AccessFlagBits start_access,
+													 SubpassHandle final_subpass, vk::PipelineStageFlagBits final_stage, vk::AccessFlagBits final_access,
+													 SamplingMode sampling_mode )
 {
 	if( start_subpass && final_subpass )
 	{
-		dependencies.emplace_back( start_subpass.index, final_subpass.index, start_stage, final_stage, start_access, final_access );
+		DependencyDescription description = { flags, start_subpass, start_stage, start_access, final_subpass, final_stage, final_access, sampling_mode };
+		dependency_descriptions.emplace_back( description );
 		return true;
 	}
-	//TODO add message
 	return false;
 }
 
@@ -125,14 +91,10 @@ bool noxcain::RenderPassDescription::update_format( FormatHandle handle, vk::For
 {
 	if( handle )
 	{
-		if( new_value != format_bindings[handle.index].format )
+		if( new_value != formats[handle.index] )
 		{
 			outdated = true;
-			format_bindings[handle.index].format = new_value;
-			for( auto& att : format_bindings[handle.index].attachments )
-			{
-				attachments[att.index].setFormat( new_value );
-			}
+			formats[handle.index] = new_value;
 		}
 		return true;
 	}
@@ -143,52 +105,162 @@ bool noxcain::RenderPassDescription::update_sample_count( SampleCountHandle hand
 {
 	if( handle )
 	{
-		if( new_value != sample_count_bindings[handle.index].sample_count )
+		if( new_value != sample_counts[handle.index] )
 		{
 			outdated = true;
-			sample_count_bindings[handle.index].sample_count = new_value;
-			for( auto& att : sample_count_bindings[handle.index].attachments )
-			{
-				attachments[att.index].setSamples( new_value );
-			}
+			sample_counts[handle.index] = new_value;
 		}
 		return true;
 	}
 	return false;
 }
 
+void noxcain::RenderPassDescription::set_decider( SampleCountHandle handle )
+{
+	decider = handle;
+}
+
 vk::RenderPass noxcain::RenderPassDescription::get_render_pass()
 {
 	ResultHandler<vk::Result> result_handler( vk::Result::eSuccess );
-	if( outdated || !render_pass )
+	if( outdated || !last_render_pass )
 	{
 		GraphicEngine::get_device().waitIdle();
-		GraphicEngine::get_device().destroy( render_pass );
+		GraphicEngine::get_device().destroy( last_render_pass );
+		last_render_pass = vk::RenderPass();
 
-		std::vector<vk::SubpassDescription> subpasses;
-		subpasses.reserve( subpass_data_buffers.size() );
-		for( const auto& subpass : subpass_data_buffers )
+		last_attachment_count = 0;
+		std::vector<vk::AttachmentDescription> vulkan_attachment_descriptions;
+		vulkan_attachment_descriptions.reserve( attachment_descriptions.size() );
+		for( auto& attachment_description : attachment_descriptions )
 		{
-			subpasses.emplace_back( 
-				vk::SubpassDescription(
-					vk::SubpassDescriptionFlags(), vk::PipelineBindPoint::eGraphics, 
-					subpass.input_attachment_refs.size(), subpass.input_attachment_refs.empty() ? nullptr : subpass.input_attachment_refs.data(),
-					subpass.color_attachment_refs.size(), subpass.color_attachment_refs.empty() ? nullptr : subpass.color_attachment_refs.data(),
-					subpass.resolve_attachment_refs.empty() ? nullptr : subpass.resolve_attachment_refs.data(),
-					subpass.has_depth_stencil_attachment ? &subpass.depth_stencil_attachment_ref : nullptr,
-					subpass.preserved_attachment_indices.size(), subpass.preserved_attachment_indices.empty() ? nullptr : subpass.preserved_attachment_indices.data() ) );
+			if( attachment_description.sampling_mode == SamplingMode::BOTH ||
+				( ( !decider || sample_counts[decider.index] == vk::SampleCountFlagBits::e1 ) && attachment_description.sampling_mode == SamplingMode::SINGLE ) ||
+				( decider && sample_counts[decider.index] != vk::SampleCountFlagBits::e1 && attachment_description.sampling_mode == SamplingMode::MULTI ) )
+			{
+				attachment_description.attachment_index = vulkan_attachment_descriptions.size();
+				auto& vulkan_attachment_description = vulkan_attachment_descriptions.emplace_back();
+
+				vulkan_attachment_description.flags = attachment_description.flags;
+				vulkan_attachment_description.format = formats[attachment_description.format.index];
+				vulkan_attachment_description.samples = sample_counts[attachment_description.sample_count.index];
+				vulkan_attachment_description.initialLayout = attachment_description.initial_image_layout;
+				vulkan_attachment_description.finalLayout = attachment_description.final_image_layout;
+				vulkan_attachment_description.loadOp = attachment_description.load_operation;
+				vulkan_attachment_description.storeOp = attachment_description.store_operation;
+				vulkan_attachment_description.stencilLoadOp = attachment_description.stencil_load_operation;
+				vulkan_attachment_description.stencilStoreOp = attachment_description.stencil_store_operation;
+
+				++last_attachment_count;
+			}
 		}
 
-		render_pass = result_handler << GraphicEngine::get_device().createRenderPass( vk::RenderPassCreateInfo( vk::RenderPassCreateFlags(),
-																												attachments.size(), attachments.data(),
-																												subpasses.size(), subpasses.data(),
-																												dependencies.size(), dependencies.data() ) );
+		std::vector<vk::SubpassDescription> vulkan_subpass_descriptions;
+		std::vector<std::vector<vk::AttachmentReference>> vulkan_input_attachments;
+		std::vector<std::vector<vk::AttachmentReference>> vulkan_color_attachments;
+		std::vector<std::vector<vk::AttachmentReference>> vulkan_resolve_attachments;
+		std::vector<vk::AttachmentReference> vulkan_depth_stencil_attachments;
+		std::vector<std::vector<UINT32>> vulkan_preserved_attachments;
+		vulkan_subpass_descriptions.reserve( subpass_data_buffers.size() );
+		vulkan_input_attachments.reserve( subpass_data_buffers.size() );
+		vulkan_color_attachments.reserve( subpass_data_buffers.size() );
+		vulkan_resolve_attachments.reserve( subpass_data_buffers.size() );
+		vulkan_depth_stencil_attachments.reserve( subpass_data_buffers.size() );
+		vulkan_preserved_attachments.reserve( subpass_data_buffers.size() );
+
+		for( auto& subpass_description : subpass_data_buffers )
+		{
+			if( subpass_description.sampling_mode == SamplingMode::BOTH ||
+				( ( !decider || sample_counts[decider.index] == vk::SampleCountFlagBits::e1 ) && subpass_description.sampling_mode == SamplingMode::SINGLE ) ||
+				( decider && sample_counts[decider.index] != vk::SampleCountFlagBits::e1 && subpass_description.sampling_mode == SamplingMode::MULTI ) )
+			{
+				subpass_description.subpass_index = vulkan_subpass_descriptions.size();
+				auto& vulkan_subpass_description = vulkan_subpass_descriptions.emplace_back();
+				vulkan_subpass_description.flags = vk::SubpassDescriptionFlags();
+				vulkan_subpass_description.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+				
+				auto& vulkan_input = vulkan_input_attachments.emplace_back();
+				vulkan_input.reserve( subpass_description.input_attachment_refs.size() );
+				for( const auto& input_ref : subpass_description.input_attachment_refs )
+				{
+					vulkan_input.emplace_back( vk::AttachmentReference( attachment_descriptions[input_ref.attachment.index].attachment_index, input_ref.layout ) );
+				}
+				vulkan_subpass_description.inputAttachmentCount = vulkan_input.size();
+				vulkan_subpass_description.pInputAttachments = vulkan_input.empty() ? nullptr : vulkan_input.data();
+
+				auto& vulkan_color = vulkan_color_attachments.emplace_back();
+				vulkan_color.reserve( subpass_description.color_attachment_refs.size() );
+				for( const auto& color_ref : subpass_description.color_attachment_refs )
+				{
+					vulkan_color.emplace_back( vk::AttachmentReference( attachment_descriptions[color_ref.attachment.index].attachment_index, color_ref.layout ) );
+				}
+				vulkan_subpass_description.colorAttachmentCount = vulkan_color.size();
+				vulkan_subpass_description.pColorAttachments = vulkan_color.empty() ? nullptr : vulkan_color.data();
+
+				auto& vulkan_resolve = vulkan_resolve_attachments.emplace_back();
+				vulkan_resolve.reserve( subpass_description.resolve_attachment_refs.size() );
+				for( const auto& resolve_ref : subpass_description.resolve_attachment_refs )
+				{
+					vulkan_resolve.emplace_back( vk::AttachmentReference( attachment_descriptions[resolve_ref.attachment.index].attachment_index, resolve_ref.layout ) );
+				}
+				vulkan_subpass_description.pResolveAttachments = vulkan_resolve.empty() ? nullptr : vulkan_resolve.data();
+
+				auto& vulkan_preserved = vulkan_preserved_attachments.emplace_back();
+				vulkan_preserved.reserve( subpass_description.preserved_attachments.size() );
+				for( const auto& preserved_ref : subpass_description.preserved_attachments )
+				{
+					vulkan_preserved.emplace_back( attachment_descriptions[preserved_ref.index].attachment_index );
+				}
+				vulkan_subpass_description.preserveAttachmentCount = vulkan_preserved.size();
+				vulkan_subpass_description.pPreserveAttachments = vulkan_preserved.empty() ? nullptr : vulkan_preserved.data();
+
+				auto& vulkan_depth_stencil = vulkan_depth_stencil_attachments.emplace_back();
+				bool has_stencil_depth_attachment = ( subpass_description.depth_stencil_attachment_ref.attachment.index >= 0 );
+				if( has_stencil_depth_attachment )
+				{
+					vulkan_depth_stencil = vk::AttachmentReference( attachment_descriptions[subpass_description.depth_stencil_attachment_ref.attachment.index].attachment_index,
+																	subpass_description.depth_stencil_attachment_ref.layout );
+					vulkan_subpass_description.pDepthStencilAttachment = &vulkan_depth_stencil;
+				}
+				else
+				{
+					vulkan_subpass_description.pDepthStencilAttachment = nullptr;
+				}
+			}
+		}
+
+		std::vector<vk::SubpassDependency> vulkan_dependency_descriptions;
+		vulkan_dependency_descriptions.reserve( dependency_descriptions.size() );
+		for( const auto& dependency_description : dependency_descriptions )
+		{
+			if( dependency_description.sampling_mode == SamplingMode::BOTH ||
+				( ( !decider || sample_counts[decider.index] == vk::SampleCountFlagBits::e1 ) && dependency_description.sampling_mode == SamplingMode::SINGLE ) ||
+				( decider && sample_counts[decider.index] != vk::SampleCountFlagBits::e1 && dependency_description.sampling_mode == SamplingMode::MULTI ) )
+			{
+				auto& vulkan_dependency_description = vulkan_dependency_descriptions.emplace_back();
+
+				vulkan_dependency_description.dependencyFlags;
+				vulkan_dependency_description.srcSubpass = subpass_data_buffers[dependency_description.start_subpass.index].subpass_index;
+				vulkan_dependency_description.srcStageMask = dependency_description.start_stage;
+				vulkan_dependency_description.srcAccessMask = dependency_description.start_access;
+				vulkan_dependency_description.dstSubpass = subpass_data_buffers[dependency_description.final_subpass.index].subpass_index;
+				vulkan_dependency_description.dstStageMask = dependency_description.final_stage;
+				vulkan_dependency_description.dstAccessMask = dependency_description.final_access;
+			}
+		}
+
+		last_render_pass = result_handler << GraphicEngine::get_device().createRenderPass(
+			vk::RenderPassCreateInfo(
+				vk::RenderPassCreateFlags(),
+				vulkan_attachment_descriptions.size(), vulkan_attachment_descriptions.empty() ? nullptr : vulkan_attachment_descriptions.data(),
+				vulkan_subpass_descriptions.size(), vulkan_subpass_descriptions.empty() ? nullptr : vulkan_subpass_descriptions.data(),
+				vulkan_dependency_descriptions.size(), vulkan_dependency_descriptions.empty() ? nullptr : vulkan_dependency_descriptions.data() ) );
 	}
 	
 	if( result_handler.all_okay() )
 	{
 		outdated = false;
-		return render_pass;
+		return last_render_pass;
 	}
 	return vk::RenderPass();
 }
@@ -202,12 +274,12 @@ noxcain::RenderPassDescription::~RenderPassDescription()
 		r_handler << GraphicEngine::get_device().waitIdle();
 		if( r_handler.all_okay() )
 		{
-			GraphicEngine::get_device().destroyRenderPass( render_pass );
+			GraphicEngine::get_device().destroyRenderPass( last_render_pass );
 		}
 	}
 }
 
 noxcain::RenderPassDescription::operator bool() const
 {
-	return static_cast<bool>( render_pass );
+	return static_cast<bool>( last_render_pass );
 }

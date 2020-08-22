@@ -169,22 +169,24 @@ void noxcain::MineSweeperLevel::create_settings_hud()
 	sampling_decrease_button->set_click_handler( [this]( const RegionalKeyEvent& regional_event, BaseButton& event_reciever ) -> bool
 	{
 		auto settings = LogicEngine::get_graphic_settings();
-		if( settings.current_sample_count > 1 )
+		UINT32 new_count = settings.get_sample_count();
+
+		if( settings.get_sample_count() > 1 )
 		{
-			--settings.current_sample_count;
+			new_count = new_count/2;
 		}
 
-		if( settings.current_sample_count <= 1 )
+		if( new_count <= 1 )
 		{
 			event_reciever.deactivate();
 		}
 
-		if( settings.current_sample_count < settings.max_sample_count )
+		if( new_count < settings.get_max_sample_count() )
 		{
 			sampling_increase_button->activate();
 		}
-
-		LogicEngine::set_graphic_settings( settings.current_sample_count, settings.current_super_sampling_factor, settings.current_resolution.width, settings.current_resolution.height );
+		sampling_description_value->get_text_element().set_utf8( std::to_string( new_count ) + "x" );
+		LogicEngine::set_sample_count( new_count );
 		return true;
 	} );
 
@@ -208,22 +210,24 @@ void noxcain::MineSweeperLevel::create_settings_hud()
 	sampling_increase_button->set_click_handler( [this]( const RegionalKeyEvent& regional_event, BaseButton& event_reciever ) -> bool
 	{
 		auto settings = LogicEngine::get_graphic_settings();
-		if( settings.current_sample_count < settings.max_sample_count )
+		UINT32 new_count = settings.get_sample_count();
+
+		if( settings.get_sample_count() < settings.get_max_sample_count() )
 		{
-			++settings.current_sample_count;
+			new_count = 2*new_count;
 		}
 
-		if( settings.current_sample_count >= settings.max_sample_count )
+		if( new_count >= settings.get_max_sample_count() )
 		{
 			event_reciever.deactivate();
 		}
 
-		if( settings.current_sample_count > 1 )
+		if( new_count > 1 )
 		{
 			sampling_decrease_button->activate();
 		}
-
-		LogicEngine::set_graphic_settings( settings.current_sample_count, settings.current_super_sampling_factor, settings.current_resolution.width, settings.current_resolution.height );
+		sampling_description_value->get_text_element().set_utf8( std::to_string( new_count ) + "x" );
+		LogicEngine::set_sample_count( new_count );
 		return true;
 	} );
 
@@ -245,12 +249,12 @@ void noxcain::MineSweeperLevel::display_settings()
 	add_user_interface( default_ui );
 
 	const auto settings = LogicEngine::get_graphic_settings();
-	sampling_description_value->get_text_element().set_utf8( std::to_string( settings.current_sample_count ) + "x" );
+	sampling_description_value->get_text_element().set_utf8( std::to_string( settings.get_sample_count() ) + "x" );
 
-	if( settings.current_sample_count <= 1 ) sampling_decrease_button->deactivate();
+	if( settings.get_sample_count() <= 1 ) sampling_decrease_button->deactivate();
 	else sampling_decrease_button->activate();
 
-	if( settings.current_sample_count >= settings.max_sample_count ) sampling_increase_button->deactivate();
+	if( settings.get_sample_count() >= settings.get_max_sample_count() ) sampling_increase_button->deactivate();
 	else sampling_increase_button->activate();
 }
 

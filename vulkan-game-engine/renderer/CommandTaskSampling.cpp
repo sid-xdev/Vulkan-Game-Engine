@@ -24,6 +24,10 @@ noxcain::SamplingTask::~SamplingTask()
 			device.destroyPipeline( sampled_pipeline );
 			device.destroyPipeline( unsampled_pipeline );
 			device.destroyPipelineLayout( sampling_pipeline_layout );
+
+			unsampled_pipeline = vk::Pipeline();
+			sampled_pipeline = vk::Pipeline();
+			sampling_pipeline_layout = vk::PipelineLayout();
 		}
 	}
 }
@@ -55,7 +59,7 @@ bool noxcain::SamplingTask::buffer_dependent_preparation( CommandData& pool_data
 
 bool noxcain::SamplingTask::record( const std::vector<vk::CommandBuffer>& buffers )
 {
-	bool multi_sampling = LogicEngine::get_graphic_settings().current_sample_count > 1;
+	bool multi_sampling = LogicEngine::get_graphic_settings().get_sample_count() > 1;
 	TimeFrame frame( time_col, 0.4F, 0.0F, 0.6F, 1.0F, "record" );
 	ResultHandler r_handler( vk::Result::eSuccess );
 	vk::CommandBufferInheritanceInfo inheritage( render_pass, subpass_index, frame_buffers.empty() ? vk::Framebuffer() : frame_buffers.front() );
@@ -121,9 +125,9 @@ bool noxcain::SamplingTask::setup_layouts()
 inline bool noxcain::SamplingTask::build_edge_detection_pipeline()
 {
 	const auto g_settings = LogicEngine::get_graphic_settings();
-	if( g_settings.current_sample_count > 1 )
+	if( g_settings.get_sample_count() > 1 )
 	{
-		auto specialization = createSpecialization( g_settings.current_sample_count );
+		auto specialization = createSpecialization( g_settings.get_sample_count() );
 		vk::SpecializationInfo specialization_info( specialization.descriptions.size(), specialization.descriptions.data(), specialization.data.size(), specialization.data.data() );
 
 		auto resolution = LogicEngine::get_graphic_settings().get_accumulated_resolution();
@@ -222,8 +226,8 @@ inline bool noxcain::SamplingTask::build_edge_detection_pipeline()
 inline bool noxcain::SamplingTask::build_shading_pipelines()
 {
 	const auto g_settings = LogicEngine::get_graphic_settings();
-	bool multi_sampling = g_settings.current_sample_count > 1;
-	auto specialization = createSpecialization( g_settings.current_sample_count );
+	bool multi_sampling = g_settings.get_sample_count() > 1;
+	auto specialization = createSpecialization( g_settings.get_sample_count() );
 	vk::SpecializationInfo specialization_info( specialization.descriptions.size(), specialization.descriptions.data(), specialization.data.size(), specialization.data.data() );
 
 	std::array<vk::PipelineShaderStageCreateInfo, 2> multisample_shader_stages =
@@ -311,6 +315,8 @@ inline bool noxcain::SamplingTask::build_shading_pipelines()
 		{
 			device.destroyPipeline( sampled_pipeline );
 			device.destroyPipeline( unsampled_pipeline );
+			unsampled_pipeline = vk::Pipeline();
+			sampled_pipeline = vk::Pipeline();
 		}
 		else
 		{

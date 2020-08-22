@@ -15,6 +15,7 @@ namespace noxcain
 	class RenderPassDescription;
 	
 	class OverlayTask;
+	class CommandSubmit;
 
 	class CommandManager
 	{
@@ -29,7 +30,7 @@ namespace noxcain
 		
 	private:
 		void run_render_loop();
-		std::thread comman_main_thread;
+		std::thread command_main_thread;
 
 		void describe_deferred_render_pass();
 		void describe_finalize_render_pass();
@@ -43,16 +44,19 @@ namespace noxcain
 
 		RenderPassDescription deferred_render_pass;
 		RenderPassDescription finalize_render_pass;
-		
-		bool validate_render_passes();
-
 
 		std::array<vk::CommandPool, RECORD_RING_SIZE> command_pools;
 		std::array<std::vector<vk::CommandBuffer>, RECORD_RING_SIZE> command_buffers;
-		bool validate_command_buffers( std::size_t buffer_id );
 		
-
-		bool validate_frame_buffers();
+		/// <summary>
+		/// checks graphic settings and recreates renderpasses and buffers if necessary
+		/// </summary>
+		inline bool update_logic( CommandSubmit& submit_controller );
+		inline bool check_settings( CommandSubmit& submit_controller );
+		inline bool validate_render_passes();
+		inline bool validate_frame_buffers();
+		inline bool validate_command_buffers( std::size_t buffer_id );
+		
 		vk::Framebuffer deferred_frame_buffer;
 		std::vector<vk::ClearValue> deferred_clear_colors;
 
@@ -66,6 +70,9 @@ namespace noxcain
 
 		vk::ClearColorValue clear_color;
 
+		/// <summary>
+		/// data transfer to gpu befor render loop
+		/// </summary>
 		bool initial_transfer();
 	};
 }

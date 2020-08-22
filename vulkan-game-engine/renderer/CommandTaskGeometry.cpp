@@ -68,7 +68,7 @@ bool noxcain::GeometryTask::build_geomtry_pipeline()
 		VK_FALSE, 0.0F, 0.0F, 0.0F, 1.0F );
 
 	vk::PipelineMultisampleStateCreateInfo multisampleState(
-		vk::PipelineMultisampleStateCreateFlags(), static_cast<vk::SampleCountFlagBits>( graphic_settings.current_sample_count ), VK_FALSE, 0.0F, nullptr, VK_FALSE );
+		vk::PipelineMultisampleStateCreateFlags(), static_cast<vk::SampleCountFlagBits>( graphic_settings.get_sample_count() ), VK_FALSE, 0.0F, nullptr, VK_FALSE );
 
 	vk::PipelineDepthStencilStateCreateInfo depthStencilState(
 		vk::PipelineDepthStencilStateCreateFlags(), VK_TRUE, VK_TRUE, vk::CompareOp::eLessOrEqual, VK_FALSE, VK_FALSE,

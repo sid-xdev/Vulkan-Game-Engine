@@ -162,7 +162,7 @@ inline bool noxcain::VectorDecalTask::build_vector_decal_pipeline()
 		VK_TRUE, -0.1F, 0.0F, 0.0F, 1.0F );
 
 	vk::PipelineMultisampleStateCreateInfo multisample_state(
-		vk::PipelineMultisampleStateCreateFlags(), static_cast<vk::SampleCountFlagBits>( g_settings.current_sample_count ), VK_FALSE, 0.0F, nullptr, VK_FALSE, VK_FALSE );
+		vk::PipelineMultisampleStateCreateFlags(), static_cast<vk::SampleCountFlagBits>( g_settings.get_sample_count() ), VK_FALSE, 0.0F, nullptr, VK_FALSE, VK_FALSE );
 
 	vk::PipelineDepthStencilStateCreateInfo depth_stencil_state(
 		vk::PipelineDepthStencilStateCreateFlags(), VK_TRUE, VK_FALSE, vk::CompareOp::eLessOrEqual, VK_FALSE, VK_FALSE,

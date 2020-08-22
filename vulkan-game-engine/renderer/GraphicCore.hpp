@@ -66,7 +66,7 @@ namespace noxcain
 		vk::Device get_logical_device() const;
 		vk::SurfaceKHR get_surface() const;
 		vk::SwapchainKHR get_swapchain() const;
-		vk::ImageView get_image_view( UINT32 index ) const;
+		vk::ImageView get_image_view( std::size_t index ) const;
 
 		void close_surface_base() const;
 		bool signal_swapchain_recreation( bool recreate_surface );

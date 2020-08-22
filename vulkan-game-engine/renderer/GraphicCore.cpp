@@ -343,7 +343,7 @@ vk::SwapchainKHR noxcain::GraphicCore::get_swapchain() const
 	return swapchain;
 }
 
-vk::ImageView noxcain::GraphicCore::get_image_view( UINT32 index ) const
+vk::ImageView noxcain::GraphicCore::get_image_view( std::size_t index ) const
 {
 	return swapChainImageViews[index];
 }

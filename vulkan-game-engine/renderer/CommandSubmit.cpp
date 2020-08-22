@@ -81,6 +81,17 @@ bool noxcain::CommandSubmit::set_newest_command_buffer( SubmitCommandBufferData 
 	return false;
 }
 
+void noxcain::CommandSubmit::clean_command_buffer()
+{
+	std::unique_lock lock( submit_mutex );
+	if( buffer_available )
+	{
+		free_buffer_ids.push_back( available_buffer.id );
+		submit_condition.notify_all();
+		buffer_available = false;
+	}
+}
+
 bool noxcain::CommandSubmit::check_swapchain()
 {
 	

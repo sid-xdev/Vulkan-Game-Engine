@@ -95,10 +95,15 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 {	
 	free_main_render_destination_memory();
 	
-	auto formats = select_main_render_formats();
 	auto g_settings = LogicEngine::get_graphic_settings();
-	auto internal_resolution = g_settings.get_accumulated_resolution();
-	vk::Extent3D internal_extent( internal_resolution.width, internal_resolution.height, 1 );
+	auto resolution = g_settings.get_accumulated_resolution();
+	UINT32 width = resolution.width;
+	UINT32 height = resolution.height;
+	
+	auto sample_count = g_settings.get_sample_count();
+	auto formats = select_main_render_formats( width, height, sample_count );
+	
+	vk::Extent3D extent( width, height, 1 );
 
 	main_render_destinations.resize( RENDER_DESTINATION_IMAGE_COUNT );
 	std::vector<ImageRequest> requests;
@@ -109,12 +114,12 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 	//----------------------------------------------------------------------------//
 
 	requests.emplace_back( main_render_destinations[static_cast<std::size_t>( RenderDestinationImages::COLOR )], vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageCreateInfo(
-		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, internal_extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.current_sample_count ), vk::ImageTiling::eOptimal,
+		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.get_sample_count() ), vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
 		vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined ) );
 
 	requests.emplace_back( main_render_destinations[static_cast<std::size_t>( RenderDestinationImages::COLOR_RESOLVED )], vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageCreateInfo(
-		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, internal_extent, 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, extent, 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eSampled,
 		vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined ) );
 
@@ -123,7 +128,7 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 	//----------------------------------------------------------------------------//
 
 	requests.emplace_back( main_render_destinations[static_cast<std::size_t>( RenderDestinationImages::NORMAL )], vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eLazilyAllocated, vk::ImageCreateInfo(
-		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, internal_extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.current_sample_count ), vk::ImageTiling::eOptimal,
+		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.get_sample_count() ), vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
 		vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined ) );
 
@@ -132,7 +137,7 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 	//----------------------------------------------------------------------------//
 
 	requests.emplace_back( main_render_destinations[static_cast<std::size_t>( RenderDestinationImages::POSITION )], vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eLazilyAllocated, vk::ImageCreateInfo(
-		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, internal_extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.current_sample_count ), vk::ImageTiling::eOptimal,
+		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.get_sample_count() ), vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
 		vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined ) );
 
@@ -141,7 +146,7 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 	//----------------------------------------------------------------------------//
 
 	requests.emplace_back( main_render_destinations[static_cast<std::size_t>( RenderDestinationImages::POST_PROCESSING )], vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageCreateInfo(
-		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, internal_extent, 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.color, extent, 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eColorAttachment,
 		vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined ) );
 
@@ -151,7 +156,7 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 
 	main_render_destinations[( std::size_t ) RenderDestinationImages::DEPTH_SAMPLED].viewAspect = vk::ImageAspectFlagBits::eDepth;
 	requests.emplace_back( main_render_destinations[(std::size_t) RenderDestinationImages::DEPTH_SAMPLED], vk::MemoryPropertyFlagBits::eLazilyAllocated | vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageCreateInfo(
-		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.depth, internal_extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.current_sample_count ), vk::ImageTiling::eOptimal,
+		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.depth, extent, 1, 1, static_cast<vk::SampleCountFlagBits>( g_settings.get_sample_count() ), vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eDepthStencilAttachment,
 		vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined ) );
 
@@ -161,7 +166,7 @@ bool noxcain::MemoryManager::setup_main_render_destination()
 
 	main_render_destinations[( std::size_t ) RenderDestinationImages::STENCIL_UNSAMPLED].viewAspect = vk::ImageAspectFlagBits::eStencil;
 	requests.emplace_back( main_render_destinations[( std::size_t ) RenderDestinationImages::STENCIL_UNSAMPLED], vk::MemoryPropertyFlagBits::eLazilyAllocated | vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageCreateInfo(
-		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.stencil, internal_extent, 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
+		vk::ImageCreateFlags(), vk::ImageType::e2D, formats.stencil, extent, 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
 		vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eDepthStencilAttachment,
 		vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined ) );
 
@@ -591,21 +596,22 @@ bool noxcain::MemoryManager::create_managed_memory(
 	return r_handler.all_okay();
 }
 
-noxcain::MemoryManager::RenderDestinationFormats noxcain::MemoryManager::select_main_render_formats()
+inline noxcain::MemoryManager::RenderDestinationFormats noxcain::MemoryManager::select_main_render_formats( UINT32& width, UINT32& height, UINT32& sample_count )
 {
 	RenderDestinationFormats formats;
-	
-	auto old_settings = LogicEngine::get_graphic_settings();
+	bool new_settings = false;
 	const auto& window_extent = GraphicEngine::get_window_resolution();
 
-	vk::SampleCountFlagBits sample_count = static_cast<vk::SampleCountFlagBits>( old_settings.current_sample_count );
-	FLOAT32 super_sampling_factor = old_settings.current_super_sampling_factor;
+	vk::SampleCountFlagBits vk_sample_count = static_cast<vk::SampleCountFlagBits>( sample_count );
 
-	auto internal_resolution = old_settings.get_accumulated_resolution();
-	vk::Extent3D available_extent = ( internal_resolution.width > 0 && internal_resolution.height > 0 ) ?
-		vk::Extent3D( internal_resolution.width, internal_resolution.height, 1 ) : vk::Extent3D( window_extent, 1 );
+	vk::Extent3D available_extent( width, height, 1 );
+	if( !available_extent.width || !available_extent.height )
+	{
+		available_extent = vk::Extent3D( window_extent, 1 );
+		new_settings = true;
+	}
 
-	vk::SampleCountFlagBits available_sample_count = sample_count;
+	vk::SampleCountFlagBits available_sample_count = vk_sample_count;
 
 	// check formats and available sizes and features
 	formats.depth = find_format( {
@@ -652,11 +658,13 @@ noxcain::MemoryManager::RenderDestinationFormats noxcain::MemoryManager::select_
 		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eInputAttachment,
 		vk::FormatFeatureFlagBits::eColorAttachmentBlend, true, available_extent, available_sample_count );
 
-	if( internal_resolution.width <= 0 || available_extent.width < internal_resolution.width ||
-		internal_resolution.height <= 0 || available_extent.height < internal_resolution.height ||
-		available_sample_count < sample_count )
+	if( new_settings || available_extent.width < width || available_extent.height < height || available_sample_count < vk_sample_count )
 	{
-		LogicEngine::set_graphic_settings( static_cast<UINT32>( available_sample_count ), 1.0, available_extent.width, available_extent.height );
+		sample_count = static_cast<UINT32>( available_sample_count );
+		width = available_extent.width;
+		height = available_extent.height;
+
+		LogicEngine::set_graphic_settings( sample_count, 1.0, width, height );
 	}
 	return formats;
 }
